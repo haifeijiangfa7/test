@@ -21,7 +21,9 @@ export default function Invitation() {
   const { data: eligibleInvitees, isLoading: inviteesLoading } = trpc.invitees.eligible.useQuery({ limit: 100 });
   const { data: accounts } = trpc.accounts.list.useQuery();
   const { data: inviteeCountData } = trpc.invitees.count.useQuery();
-  const { data: stats } = trpc.stats.get.useQuery();
+  const { data: stats } = trpc.stats.get.useQuery(undefined, {
+    refetchInterval: 5000, // 每5秒自动刷新
+  });
 
   const executeMutation = trpc.invitation.execute.useMutation({
     onSuccess: (result) => {
@@ -35,6 +37,7 @@ export default function Invitation() {
       utils.stats.get.invalidate();
       utils.stock.normal.list.invalidate();
       utils.stock.vip.list.invalidate();
+      utils.accounts.list.invalidate();
     },
     onError: (error) => {
       toast.error(`邀请失败: ${error.message}`);
@@ -166,16 +169,12 @@ export default function Invitation() {
                   <SelectItem value="manual">手动输入邀请码</SelectItem>
                   {accounts?.map((account) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.email} ({account.inviteCode || "无邀请码"}) - 已用{account.inviteUsedCount || 0}/10
+                      {account.email} ({account.inviteCode || "无邀请码"})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedAccount && (
-                <p className="text-xs text-gray-500">
-                  剩余邀请次数: {10 - (selectedAccount.inviteUsedCount || 0)} 次
-                </p>
-              )}
+
             </div>
             <div className="space-y-2">
               <Label>邀请码或邀请链接</Label>

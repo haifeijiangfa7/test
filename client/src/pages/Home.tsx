@@ -5,7 +5,9 @@ import { useLocation } from "wouter";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { data: stats, isLoading } = trpc.stats.get.useQuery();
+  const { data: stats, isLoading } = trpc.stats.get.useQuery(undefined, {
+    refetchInterval: 5000, // 每5秒自动刷新
+  });
 
   const statCards = [
     {

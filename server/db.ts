@@ -438,14 +438,14 @@ export async function getAccountStats() {
   const [accountsCount] = await db.select({ count: sql<number>`count(*)` }).from(accounts);
   const [vipAccountsCount] = await db.select({ count: sql<number>`count(*)` }).from(vipAccounts);
   const [inviteesCount] = await db.select({ count: sql<number>`count(*)` }).from(invitees);
-  const [normalStockCount] = await db.select({ count: sql<number>`count(*)` }).from(normalAccountStock);
+  // normalStock现在显示accounts表的数量（与账号库存页面一致）
   const [vipStockCount] = await db.select({ count: sql<number>`count(*)` }).from(vipAccountStock);
   
   return {
     accounts: accountsCount?.count || 0,
     vipAccounts: vipAccountsCount?.count || 0,
     invitees: inviteesCount?.count || 0,
-    normalStock: normalStockCount?.count || 0,
+    normalStock: accountsCount?.count || 0, // 使用accounts表的数量
     vipStock: vipStockCount?.count || 0,
   };
 }

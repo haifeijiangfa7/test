@@ -347,7 +347,7 @@ export default function AccountStock() {
                       <TableHead>积分</TableHead>
                       <TableHead>积分分类</TableHead>
                       <TableHead>邀请码</TableHead>
-                      <TableHead>已用/总数</TableHead>
+                      <TableHead>已用次数</TableHead>
                       <TableHead>状态</TableHead>
                       <TableHead>最后检查</TableHead>
                       <TableHead className="text-right">操作</TableHead>
@@ -365,7 +365,7 @@ export default function AccountStock() {
                           <TableCell>{account.totalCredits || "-"}</TableCell>
                           <TableCell>{getCreditCategoryBadge(account.totalCredits)}</TableCell>
                           <TableCell className="font-mono text-sm">{account.inviteCode || "-"}</TableCell>
-                          <TableCell>{account.inviteUsedCount || 0}/10</TableCell>
+                          <TableCell>{account.inviteUsedCount || 0}</TableCell>
                           <TableCell>
                             {account.isBlocked ? (
                               <Badge variant="destructive">已封禁</Badge>
@@ -490,7 +490,7 @@ export default function AccountStock() {
                       <TableHead>积分</TableHead>
                       <TableHead>积分分类</TableHead>
                       <TableHead>邀请码</TableHead>
-                      <TableHead>已用/总数</TableHead>
+                      <TableHead>已用次数</TableHead>
                       <TableHead>状态</TableHead>
                       <TableHead>最后检查</TableHead>
                       <TableHead className="text-right">操作</TableHead>
@@ -508,7 +508,7 @@ export default function AccountStock() {
                           <TableCell>{account.totalCredits || "-"}</TableCell>
                           <TableCell>{getCreditCategoryBadge(account.totalCredits)}</TableCell>
                           <TableCell className="font-mono text-sm">{account.inviteCode || "-"}</TableCell>
-                          <TableCell>{account.inviteUsedCount || 0}/10</TableCell>
+                          <TableCell>{account.inviteUsedCount || 0}</TableCell>
                           <TableCell>
                             {account.isBlocked ? (
                               <Badge variant="destructive">已封禁</Badge>
