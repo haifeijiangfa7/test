@@ -709,7 +709,7 @@ export const appRouter = router({
             const creditsAfter = await manusApi.getCredits(invitee.token, invitee.clientId);
             
             // 验证邀请是否成功
-            const success = manusApi.verifyInvitationSuccess(creditsBefore.freeCredits, creditsAfter.freeCredits);
+            const success = manusApi.verifyInvitationSuccess(creditsBefore.freeCredits || 0, creditsAfter.freeCredits || 0);
 
             await db.createInvitationLog({
               inviterAccountId: input.inviterAccountId || 0,
@@ -729,8 +729,8 @@ export const appRouter = router({
                 password: invitee.password,
                 token: invitee.token,
                 clientId: invitee.clientId,
-                credits: creditsAfter.freeCredits,
-                creditCategory: manusApi.getCreditCategory(creditsAfter.freeCredits),
+                credits: creditsAfter.freeCredits || 0,
+                creditCategory: manusApi.getCreditCategory(creditsAfter.freeCredits || 0),
               });
               await db.deleteInvitee(invitee.id);
               results.success++;
@@ -814,7 +814,7 @@ export const appRouter = router({
             
             if (result.success) {
               const creditsAfter = await manusApi.getCredits(invitee.token, invitee.clientId);
-              const success = manusApi.verifyInvitationSuccess(creditsBefore.freeCredits, creditsAfter.freeCredits);
+              const success = manusApi.verifyInvitationSuccess(creditsBefore.freeCredits || 0, creditsAfter.freeCredits || 0);
 
               await db.createInvitationLog({
                 inviterAccountId: task.targetAccountId || 0,
@@ -835,8 +835,8 @@ export const appRouter = router({
                   password: invitee.password,
                   token: invitee.token,
                   clientId: invitee.clientId,
-                  credits: creditsAfter.freeCredits,
-                  creditCategory: manusApi.getCreditCategory(creditsAfter.freeCredits),
+                  credits: creditsAfter.freeCredits || 0,
+                  creditCategory: manusApi.getCreditCategory(creditsAfter.freeCredits || 0),
                 });
                 await db.deleteInvitee(invitee.id);
               } else {
