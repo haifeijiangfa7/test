@@ -153,6 +153,7 @@ export const creditTasks = mysqlTable("credit_tasks", {
   requiredInvites: int("requiredInvites").notNull(),
   completedInvites: int("completedInvites").default(0),
   failedInvites: int("failedInvites").default(0),
+  inviteeEmails: text("inviteeEmails"), // 存储被邀请者邮箱列表，用逗号分隔
   status: mysqlEnum("status", ["pending", "running", "completed", "failed", "paused"]).default("pending").notNull(),
   errorMessage: text("errorMessage"),
   startedAt: timestamp("startedAt"),

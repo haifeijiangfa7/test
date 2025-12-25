@@ -128,32 +128,32 @@ export default function AccountStock() {
     toast.success("已复制账号信息");
   };
 
-  // 根据实际积分获取分类（从1800开始，每次+500）
+  // 根据实际积分获取分类（从1500开始，每次+500）
   const getCreditCategory = (credits: number | null | undefined): string => {
     if (!credits) return "未知";
-    if (credits < 1800) return `${credits}`;
-    if (credits < 2300) return "1800";
-    if (credits < 2800) return "2300";
-    if (credits < 3300) return "2800";
-    if (credits < 3800) return "3300";
-    if (credits < 4300) return "3800";
-    if (credits < 4800) return "4300";
-    if (credits < 5300) return "4800";
-    return "5300+";
+    if (credits < 1500) return `${credits}`;
+    if (credits < 2000) return "1500";
+    if (credits < 2500) return "2000";
+    if (credits < 3000) return "2500";
+    if (credits < 3500) return "3000";
+    if (credits < 4000) return "3500";
+    if (credits < 4500) return "4000";
+    if (credits < 5000) return "4500";
+    return "5000+";
   };
 
   const getCreditCategoryBadge = (credits: number | null | undefined) => {
     const category = getCreditCategory(credits);
     const colors: Record<string, string> = {
       "未知": "bg-gray-400",
-      "1800": "bg-gray-500",
-      "2300": "bg-blue-500",
-      "2800": "bg-green-500",
-      "3300": "bg-yellow-500",
-      "3800": "bg-orange-500",
-      "4300": "bg-red-500",
-      "4800": "bg-purple-500",
-      "5300+": "bg-pink-500",
+      "1500": "bg-gray-500",
+      "2000": "bg-blue-500",
+      "2500": "bg-green-500",
+      "3000": "bg-yellow-500",
+      "3500": "bg-orange-500",
+      "4000": "bg-red-500",
+      "4500": "bg-purple-500",
+      "5000+": "bg-pink-500",
     };
     // 对于非标准分类（如500、1000等），使用实际积分值显示
     const displayCategory = colors[category] ? category : `${credits}`;

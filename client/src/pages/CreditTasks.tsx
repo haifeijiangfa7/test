@@ -13,8 +13,8 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Play, Trash2, Link, User, Crown, Hash, AlertTriangle } from "lucide-react";
 
-// 积分分类：从1800开始，每次+500
-const CREDIT_CATEGORIES = [1800, 2300, 2800, 3300, 3800, 4300, 4800, 5300];
+// 积分分类：从1500开始，每次+500
+const CREDIT_CATEGORIES = [1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000];
 
 // 根据积分值获取分类
 const getCreditCategory = (credits: number): number => {
@@ -24,7 +24,7 @@ const getCreditCategory = (credits: number): number => {
       return CREDIT_CATEGORIES[i];
     }
   }
-  return 0; // 小于1800的账号不在分类中
+  return 0; // 小于1500的账号不在分类中
 };
 
 export default function CreditTasks() {
@@ -36,12 +36,12 @@ export default function CreditTasks() {
   
   // 普通账号模式
   const [normalSourceCategory, setNormalSourceCategory] = useState(""); // 账号来源分类
-  const [normalTargetCredits, setNormalTargetCredits] = useState("2300"); // 目标积分
+  const [normalTargetCredits, setNormalTargetCredits] = useState("2000"); // 目标积分
   const [normalMakeCount, setNormalMakeCount] = useState("1");
   
   // 会员账号模式
   const [vipSourceCategory, setVipSourceCategory] = useState(""); // 账号来源分类
-  const [vipTargetCredits, setVipTargetCredits] = useState("2300"); // 目标积分
+  const [vipTargetCredits, setVipTargetCredits] = useState("2000"); // 目标积分
   const [vipMakeCount, setVipMakeCount] = useState("1");
 
   // 警告弹窗
@@ -667,6 +667,7 @@ export default function CreditTasks() {
               <TableRow>
                 <TableHead>模式</TableHead>
                 <TableHead>目标账号</TableHead>
+                <TableHead>被邀请者</TableHead>
                 <TableHead>目标积分</TableHead>
                 <TableHead>进度</TableHead>
                 <TableHead>状态</TableHead>
@@ -677,13 +678,13 @@ export default function CreditTasks() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                     加载中...
                   </TableCell>
                 </TableRow>
               ) : tasks?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                     暂无任务
                   </TableCell>
                 </TableRow>
@@ -691,8 +692,21 @@ export default function CreditTasks() {
                 tasks?.map((task) => (
                   <TableRow key={task.id}>
                     <TableCell>{getModeLabel(task.mode)}</TableCell>
-                    <TableCell className="max-w-[150px] truncate">
+                    <TableCell className="max-w-[150px] truncate" title={task.targetEmail || task.targetInviteCode}>
                       {task.targetEmail || task.targetInviteCode}
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      {task.inviteeEmails ? (
+                        <div className="text-xs text-gray-600">
+                          {task.inviteeEmails.split(',').map((email, idx) => (
+                            <div key={idx} className="truncate" title={email}>
+                              {email}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </TableCell>
                     <TableCell>{task.targetCredits}</TableCell>
                     <TableCell>

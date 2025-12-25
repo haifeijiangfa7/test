@@ -804,6 +804,7 @@ export const appRouter = router({
 
         let completed = task.completedInvites || 0;
         let failed = task.failedInvites || 0;
+        const inviteeEmailsList: string[] = task.inviteeEmails ? task.inviteeEmails.split(',') : [];
 
         for (const invitee of eligibleInvitees) {
           if (completed >= task.requiredInvites) break;
@@ -829,9 +830,10 @@ export const appRouter = router({
 
               if (success) {
                 completed++;
+                inviteeEmailsList.push(invitee.email); // 记录被邀请者邮箱
                 const newCredits = creditsAfter.freeCredits || 0;
-                // 只有积分达到1800才添加到库存
-                if (newCredits >= 1800) {
+                // 积分达到1500就添加到库存（邀请成功后从1000变为1500）
+                if (newCredits >= 1500) {
                   await db.createNormalAccountStock({
                     email: invitee.email,
                     password: invitee.password,
@@ -842,7 +844,7 @@ export const appRouter = router({
                   });
                   await db.deleteInvitee(invitee.id);
                 } else {
-                  // 积分未达到1800，更新被邀请账号的积分信息
+                  // 积分未达到1500，更新被邀请账号的积分信息
                   await db.updateInvitee(invitee.id, {
                     freeCredits: newCredits,
                     lastCheckedAt: new Date(),
@@ -859,6 +861,7 @@ export const appRouter = router({
               completedInvites: completed, 
               failedInvites: failed,
               currentCredits: task.initialCredits + (completed * 500),
+              inviteeEmails: inviteeEmailsList.join(','),
             });
           } catch (error) {
             failed++;

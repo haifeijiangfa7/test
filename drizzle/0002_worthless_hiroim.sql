@@ -1,0 +1,1 @@
+ALTER TABLE `credit_tasks` ADD `inviteeEmails` text;

@@ -15,6 +15,13 @@
       "when": 1766677576150,
       "tag": "0001_rapid_thunderbolt_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1766683781204,
+      "tag": "0002_worthless_hiroim",
+      "breakpoints": true
     }
   ]
 }
