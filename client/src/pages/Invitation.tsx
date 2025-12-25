@@ -6,19 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Send, Link } from "lucide-react";
+import { Send, Link, Hash } from "lucide-react";
 
 export default function Invitation() {
   const [inviteCode, setInviteCode] = useState("");
   const [selectedInviteeIds, setSelectedInviteeIds] = useState<number[]>([]);
   const [inviterAccountId, setInviterAccountId] = useState<string>("");
+  const [inviteCount, setInviteCount] = useState<number>(1);
 
   const utils = trpc.useUtils();
   const { data: eligibleInvitees, isLoading: inviteesLoading } = trpc.invitees.eligible.useQuery({ limit: 100 });
   const { data: accounts } = trpc.accounts.available.useQuery();
-  const { data: inviteeCount } = trpc.invitees.count.useQuery();
+  const { data: inviteeCountData } = trpc.invitees.count.useQuery();
+  const { data: stats } = trpc.stats.get.useQuery();
 
   const executeMutation = trpc.invitation.execute.useMutation({
     onSuccess: (result) => {
@@ -30,6 +33,8 @@ export default function Invitation() {
       utils.invitees.eligible.invalidate();
       utils.invitees.count.invalidate();
       utils.stats.get.invalidate();
+      utils.stock.normal.list.invalidate();
+      utils.stock.vip.list.invalidate();
     },
     onError: (error) => {
       toast.error(`邀请失败: ${error.message}`);
@@ -76,11 +81,62 @@ export default function Invitation() {
     });
   };
 
+  // 获取选中的邀请者账号信息
+  const selectedAccount = accounts?.find(a => a.id.toString() === inviterAccountId);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">执行邀请</h1>
         <p className="text-gray-500 mt-1">选择被邀请账号并执行邀请操作</p>
+      </div>
+
+      {/* 统计信息 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">待邀请账号</p>
+                <p className="text-2xl font-bold">{inviteeCountData?.count || 0}</p>
+              </div>
+              <Badge variant="secondary">符合条件</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">普通账号库存</p>
+                <p className="text-2xl font-bold">{stats?.normalStock || 0}</p>
+              </div>
+              <Badge className="bg-blue-500">普通</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">会员账号库存</p>
+                <p className="text-2xl font-bold">{stats?.vipStock || 0}</p>
+              </div>
+              <Badge className="bg-amber-500">会员</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">已选择</p>
+                <p className="text-2xl font-bold">{selectedInviteeIds.length}</p>
+              </div>
+              <Badge className="bg-green-500">待邀请</Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* 邀请设置 */}
@@ -90,7 +146,7 @@ export default function Invitation() {
           <CardDescription>设置邀请码和邀请者账号</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>邀请者账号（可选）</Label>
               <Select value={inviterAccountId} onValueChange={setInviterAccountId}>
@@ -101,11 +157,16 @@ export default function Invitation() {
                   <SelectItem value="manual">手动输入邀请码</SelectItem>
                   {accounts?.map((account) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.email} ({account.inviteCode || "无邀请码"})
+                      {account.email} ({account.inviteCode || "无邀请码"}) - 已用{account.inviteUsedCount || 0}/10
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedAccount && (
+                <p className="text-xs text-gray-500">
+                  剩余邀请次数: {10 - (selectedAccount.inviteUsedCount || 0)} 次
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>邀请码或邀请链接</Label>
@@ -119,6 +180,23 @@ export default function Invitation() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>邀请次数</Label>
+              <div className="relative">
+                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="number"
+                  min={1}
+                  max={selectedInviteeIds.length || 100}
+                  value={inviteCount}
+                  onChange={(e) => setInviteCount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="pl-10"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                每个被邀请账号将被邀请 {inviteCount} 次（每次+500积分）
+              </p>
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <Button
@@ -127,10 +205,10 @@ export default function Invitation() {
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Send className="w-4 h-4 mr-2" />
-              批量邀请 ({selectedInviteeIds.length})
+              {executeMutation.isPending ? "邀请中..." : `批量邀请 (${selectedInviteeIds.length}个账号)`}
             </Button>
             <span className="text-sm text-gray-500">
-              已选择 {selectedInviteeIds.length} 个账号
+              已选择 {selectedInviteeIds.length} 个账号，预计增加 {selectedInviteeIds.length * inviteCount * 500} 积分
             </span>
           </div>
         </CardContent>
@@ -141,7 +219,7 @@ export default function Invitation() {
         <CardHeader>
           <CardTitle>符合条件的账号</CardTitle>
           <CardDescription>
-            共 {inviteeCount?.count || 0} 个账号符合邀请条件（未封禁、已验证短信、免费积分1000）
+            共 {inviteeCountData?.count || 0} 个账号符合邀请条件（未封禁、已验证短信、免费积分1000）
           </CardDescription>
         </CardHeader>
         <CardContent>

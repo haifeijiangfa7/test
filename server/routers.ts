@@ -862,6 +862,78 @@ export const appRouter = router({
           completedAt: finalStatus === 'completed' ? new Date() : undefined,
         });
 
+        // 任务完成后，将目标账号更新到库存中
+        if (finalStatus === 'completed' && task.targetAccountId) {
+          const finalCredits = task.initialCredits + (completed * 500);
+          const creditCategory = manusApi.getCreditCategory(finalCredits);
+          
+          if (task.mode === 'normal_account') {
+            // 检查目标账号是否已在库存中
+            const existingStock = await db.getNormalAccountStockByEmail(task.targetEmail || '');
+            if (existingStock) {
+              // 更新现有库存记录
+              await db.updateNormalAccountStock(existingStock.id, {
+                credits: finalCredits,
+                creditCategory,
+              });
+            } else {
+              // 从普通账号表获取完整信息并添加到库存
+              const account = await db.getAccountById(task.targetAccountId);
+              if (account) {
+                await db.createNormalAccountStock({
+                  email: account.email,
+                  password: account.password,
+                  token: account.token,
+                  clientId: account.clientId,
+                  credits: finalCredits,
+                  creditCategory,
+                });
+              }
+            }
+            // 记录到账号制作日志
+            await db.createNormalAccountLog({
+              email: task.targetEmail || '',
+              password: task.targetPassword || '',
+              targetCredits: task.targetCredits,
+              actualCredits: finalCredits,
+              inviteCount: completed,
+              taskId: task.id,
+            });
+          } else if (task.mode === 'vip_account') {
+            // 检查目标账号是否已在库存中
+            const existingStock = await db.getVipAccountStockByEmail(task.targetEmail || '');
+            if (existingStock) {
+              // 更新现有库存记录
+              await db.updateVipAccountStock(existingStock.id, {
+                credits: finalCredits,
+                creditCategory,
+              });
+            } else {
+              // 从会员账号表获取完整信息并添加到库存
+              const account = await db.getVipAccountById(task.targetAccountId);
+              if (account) {
+                await db.createVipAccountStock({
+                  email: account.email,
+                  password: account.password,
+                  token: account.token,
+                  clientId: account.clientId,
+                  credits: finalCredits,
+                  creditCategory,
+                });
+              }
+            }
+            // 记录到账号制作日志
+            await db.createVipAccountLog({
+              email: task.targetEmail || '',
+              password: task.targetPassword || '',
+              targetCredits: task.targetCredits,
+              actualCredits: finalCredits,
+              inviteCount: completed,
+              taskId: task.id,
+            });
+          }
+        }
+
         return { success: true, completed, failed };
       }),
 

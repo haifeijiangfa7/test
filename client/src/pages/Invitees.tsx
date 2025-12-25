@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -6,15 +6,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Trash2, Download, Copy, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Download, Copy, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Invitees() {
   const [importData, setImportData] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState<number | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   const utils = trpc.useUtils();
   const { data: invitees, isLoading } = trpc.invitees.list.useQuery();
@@ -29,6 +32,32 @@ export default function Invitees() {
       setImportData("");
       utils.invitees.list.invalidate();
       utils.stats.get.invalidate();
+      
+      // 导入成功后延迟5秒自动刷新所有账号
+      if (result.success > 0) {
+        toast.info("5秒后将自动刷新所有账号信息...");
+        setAutoRefreshCountdown(5);
+        
+        // 清除之前的定时器
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+        }
+        
+        // 倒计时
+        countdownRef.current = setInterval(() => {
+          setAutoRefreshCountdown((prev) => {
+            if (prev === null || prev <= 1) {
+              if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+              }
+              // 执行刷新
+              refreshAllMutation.mutate();
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
     },
     onError: (error) => {
       toast.error(`导入失败: ${error.message}`);
@@ -57,9 +86,11 @@ export default function Invitees() {
       toast.success(`刷新完成: 成功${result.success}个, 失败${result.failed}个, 转移${result.transferred}个, 删除${result.deleted}个`);
       utils.invitees.list.invalidate();
       utils.stats.get.invalidate();
+      setAutoRefreshCountdown(null);
     },
     onError: (error) => {
       toast.error(`刷新失败: ${error.message}`);
+      setAutoRefreshCountdown(null);
     },
   });
 
@@ -130,10 +161,10 @@ export default function Invitees() {
           <Button 
             variant="outline" 
             onClick={() => refreshAllMutation.mutate()}
-            disabled={refreshAllMutation.isPending}
+            disabled={refreshAllMutation.isPending || autoRefreshCountdown !== null}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
-            一键刷新
+            {autoRefreshCountdown !== null ? `${autoRefreshCountdown}秒后刷新` : '一键刷新'}
           </Button>
           <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
             <DialogTrigger asChild>
@@ -146,7 +177,7 @@ export default function Invitees() {
               <DialogHeader>
                 <DialogTitle>批量导入被邀请账号</DialogTitle>
                 <DialogDescription>
-                  每行一个账号，格式：邮箱----密码----token
+                  每行一个账号，格式：邮箱----密码----token（导入后将自动刷新账号信息）
                 </DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[400px] w-full">
@@ -175,6 +206,23 @@ export default function Invitees() {
           </Dialog>
         </div>
       </div>
+
+      {/* 自动刷新进度条 */}
+      {autoRefreshCountdown !== null && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-600 animate-pulse" />
+              <div className="flex-1">
+                <p className="text-sm text-blue-800 mb-2">
+                  {autoRefreshCountdown}秒后自动刷新所有账号信息...
+                </p>
+                <Progress value={(5 - autoRefreshCountdown) * 20} className="h-2" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

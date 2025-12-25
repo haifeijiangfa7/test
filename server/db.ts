@@ -449,3 +449,31 @@ export async function getAccountStats() {
     vipStock: vipStockCount?.count || 0,
   };
 }
+
+
+// ============ Update Account Stock ============
+export async function updateNormalAccountStock(id: number, data: Partial<InsertNormalAccountStock>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(normalAccountStock).set(data).where(eq(normalAccountStock.id, id));
+}
+
+export async function updateVipAccountStock(id: number, data: Partial<InsertVipAccountStock>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(vipAccountStock).set(data).where(eq(vipAccountStock.id, id));
+}
+
+export async function getNormalAccountStockByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(normalAccountStock).where(eq(normalAccountStock.email, email)).limit(1);
+  return result[0] || null;
+}
+
+export async function getVipAccountStockByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(vipAccountStock).where(eq(vipAccountStock.email, email)).limit(1);
+  return result[0] || null;
+}
