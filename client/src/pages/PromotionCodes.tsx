@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -33,37 +31,35 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Gift, Upload, Trash2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Gift, Upload, Trash2, Search, RefreshCw } from "lucide-react";
 
+// 兑换码类型
 interface PromotionCode {
   id: number;
   code: string;
-  isUsed: boolean;
-  usedByEmail: string | null;
-  usedAt: Date | null;
   createdAt: Date;
 }
 
 export default function PromotionCodes() {
-  const [searchTerm, setSearchTerm] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const utils = trpc.useUtils();
-
-  // 查询兑换码列表
+  // 获取兑换码列表
   const { data: codes, isLoading, refetch } = trpc.promotionCodes.list.useQuery();
 
-  // 批量导入mutation - 使用import而不是importBatch
+  // 批量导入mutation
   const importMutation = trpc.promotionCodes.import.useMutation({
-    onSuccess: (result) => {
+    onSuccess: (result: { success: number; failed: number }) => {
       toast.success(`成功导入 ${result.success} 个兑换码${result.failed > 0 ? `，${result.failed} 个失败` : ""}`);
       setImportDialogOpen(false);
       setImportText("");
       refetch();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`导入失败: ${error.message}`);
     },
   });
@@ -74,7 +70,7 @@ export default function PromotionCodes() {
       toast.success("删除成功");
       refetch();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`删除失败: ${error.message}`);
     },
   });
@@ -96,18 +92,16 @@ export default function PromotionCodes() {
 
   // 统计
   const totalCodes = codes?.length || 0;
-  const usedCodes = codes?.filter((c: PromotionCode) => c.isUsed).length || 0;
-  const availableCodes = totalCodes - usedCodes;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">兑换码管理</h1>
-        <p className="text-muted-foreground">管理Manus兑换码，支持批量导入和删除</p>
+        <p className="text-muted-foreground">管理Manus兑换码，支持批量导入和删除（兑换码可循环利用）</p>
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">总计兑换码</CardTitle>
@@ -121,15 +115,8 @@ export default function PromotionCodes() {
             <CardTitle className="text-sm font-medium text-muted-foreground">可用兑换码</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{availableCodes}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">已使用</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-500">{usedCodes}</div>
+            <div className="text-2xl font-bold text-green-600">{totalCodes}</div>
+            <p className="text-xs text-muted-foreground mt-1">所有兑换码均可循环利用</p>
           </CardContent>
         </Card>
       </div>
@@ -161,14 +148,15 @@ export default function PromotionCodes() {
                   <DialogHeader>
                     <DialogTitle>批量导入兑换码</DialogTitle>
                     <DialogDescription>
-                      每行一个兑换码，系统会自动去重
+                      每行一个兑换码，支持批量导入
                     </DialogDescription>
                   </DialogHeader>
                   <Textarea
-                    placeholder="每行一个兑换码..."
+                    placeholder="请输入兑换码，每行一个..."
                     value={importText}
                     onChange={(e) => setImportText(e.target.value)}
                     rows={10}
+                    className="font-mono"
                   />
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
@@ -185,19 +173,19 @@ export default function PromotionCodes() {
         </CardHeader>
         <CardContent>
           {/* 搜索框 */}
-          <div className="flex items-center gap-2 mb-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="mb-4">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索兑换码..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
           </div>
 
-          {/* 兑换码表格 */}
+          {/* 兑换码列表 */}
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">加载中...</div>
           ) : filteredCodes && filteredCodes.length > 0 ? (
@@ -207,8 +195,6 @@ export default function PromotionCodes() {
                   <TableRow>
                     <TableHead>兑换码</TableHead>
                     <TableHead>状态</TableHead>
-                    <TableHead>使用账号</TableHead>
-                    <TableHead>使用时间</TableHead>
                     <TableHead>创建时间</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
@@ -218,17 +204,7 @@ export default function PromotionCodes() {
                     <TableRow key={code.id}>
                       <TableCell className="font-mono">{code.code}</TableCell>
                       <TableCell>
-                        {code.isUsed ? (
-                          <Badge variant="secondary">已使用</Badge>
-                        ) : (
-                          <Badge variant="default" className="bg-green-500">可用</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {code.usedByEmail || "-"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {code.usedAt ? new Date(code.usedAt).toLocaleString() : "-"}
+                        <Badge variant="default" className="bg-green-500">可用</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(code.createdAt).toLocaleString()}
@@ -266,7 +242,7 @@ export default function PromotionCodes() {
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              {searchTerm ? "没有找到匹配的兑换码" : "暂无兑换码，请点击\"批量导入\"添加"}
+              暂无兑换码，请点击"批量导入"添加
             </div>
           )}
         </CardContent>

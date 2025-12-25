@@ -490,13 +490,15 @@ export async function getAllPromotionCodes() {
 export async function getAvailablePromotionCodes() {
   const db = await getDb();
   if (!db) return [];
-  return await db.select().from(promotionCodes).where(eq(promotionCodes.isUsed, false)).orderBy(desc(promotionCodes.createdAt));
+  // 兑换码可循环利用，所有兑换码都可用
+  return await db.select().from(promotionCodes).orderBy(desc(promotionCodes.createdAt));
 }
 
 export async function getRandomAvailablePromotionCode() {
   const db = await getDb();
   if (!db) return null;
-  const available = await db.select().from(promotionCodes).where(eq(promotionCodes.isUsed, false));
+  // 兑换码可循环利用，从所有兑换码中随机选择
+  const available = await db.select().from(promotionCodes);
   if (available.length === 0) return null;
   const randomIndex = Math.floor(Math.random() * available.length);
   return available[randomIndex];
@@ -534,14 +536,13 @@ export async function deletePromotionCode(id: number) {
 
 export async function getPromotionCodeStats() {
   const db = await getDb();
-  if (!db) return { total: 0, available: 0, used: 0 };
+  if (!db) return { total: 0, available: 0 };
   
   const [totalCount] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes);
-  const [availableCount] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes).where(eq(promotionCodes.isUsed, false));
   
+  // 兑换码可循环利用，所有兑换码都可用
   return {
     total: totalCount?.count || 0,
-    available: availableCount?.count || 0,
-    used: (totalCount?.count || 0) - (availableCount?.count || 0),
+    available: totalCount?.count || 0,
   };
 }

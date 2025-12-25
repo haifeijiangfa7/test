@@ -767,8 +767,7 @@ export default function CreditTasks() {
               </div>
               <div className="text-sm text-gray-500 space-y-1">
                 <p>
-                  可用兑换码: {promotionCodeStats?.available || 0} 个 | 
-                  已使用: {promotionCodeStats?.used || 0} 个
+                  可用兑换码: {promotionCodeStats?.available || 0} 个（可循环利用）
                 </p>
                 <p>
                   {redeemAccountType === 'normal' ? '普通' : '会员'}账号分类: 

@@ -1345,22 +1345,19 @@ export const appRouter = router({
           }
           codeToUse = randomCode.code;
         } else {
-          // 检查指定的兑换码是否可用
+          // 检查指定的兑换码是否存在
           const existingCode = await db.getPromotionCodeByCode(codeToUse);
           if (!existingCode) {
             throw new Error('兑换码不存在');
           }
-          if (existingCode.isUsed) {
-            throw new Error('兑换码已被使用');
-          }
+          // 兑换码可循环利用，不检查是否已使用
         }
 
         // 调用Manus API执行兑换码
         const result = await manusApi.redeemPromotionCode(input.token, input.clientId, codeToUse);
         
         if (result.success) {
-          // 标记兑换码为已使用
-          await db.markPromotionCodeUsed(codeToUse, input.email, input.accountType);
+          // 兑换码可循环利用，不标记为已使用
           
           // 刷新账号积分
           const credits = await manusApi.getCredits(input.token, input.clientId);
@@ -1442,8 +1439,7 @@ export const appRouter = router({
             const result = await manusApi.redeemPromotionCode(account.token, account.clientId, randomCode.code);
             
             if (result.success) {
-              // 标记兑换码为已使用
-              await db.markPromotionCodeUsed(randomCode.code, account.email, input.accountType);
+              // 兑换码可循环利用，不标记为已使用
               
               // 刷新账号积分
               const credits = await manusApi.getCredits(account.token, account.clientId);
