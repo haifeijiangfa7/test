@@ -1264,34 +1264,6 @@ export const appRouter = router({
         }
       }),
   }),
-
-  // ============ 兑换码管理 ============
-  promotionCodes: router({
-    list: publicProcedure.query(async () => {
-      return await db.getAllPromotionCodes();
-    }),
-
-    stats: publicProcedure.query(async () => {
-      return await db.getPromotionCodeStats();
-    }),
-
-    import: publicProcedure
-      .input(z.object({ codes: z.string() }))
-      .mutation(async ({ input }) => {
-        const codeList = input.codes.trim().split('\n').filter(c => c.trim());
-        return await db.importPromotionCodes(codeList);
-      }),
-
-    delete: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await db.deletePromotionCode(input.id);
-      }),
-
-    getRandom: publicProcedure.query(async () => {
-      return await db.getRandomPromotionCode();
-    }),
-  }),
 });
 
 export type AppRouter = typeof appRouter;

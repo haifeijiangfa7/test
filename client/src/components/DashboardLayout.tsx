@@ -30,8 +30,7 @@ import {
   Target, 
   History, 
   Package,
-  FileText,
-  Gift
+  FileText
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -46,7 +45,6 @@ const menuItems = [
   { icon: History, label: "邀请记录", path: "/logs" },
   { icon: FileText, label: "制作记录", path: "/account-logs" },
   { icon: Package, label: "账号库存", path: "/account-stock" },
-  { icon: Gift, label: "兑换码管理", path: "/promotion-codes" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

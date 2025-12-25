@@ -11,7 +11,6 @@ import CreditTasks from "./pages/CreditTasks";
 import InvitationLogs from "./pages/InvitationLogs";
 import AccountLogs from "./pages/AccountLogs";
 import AccountStock from "./pages/AccountStock";
-import PromotionCodes from "./pages/PromotionCodes";
 import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
@@ -24,7 +23,6 @@ function Router() {
       <Route path="/logs" component={InvitationLogs} />
       <Route path="/account-logs" component={AccountLogs} />
       <Route path="/account-stock" component={AccountStock} />
-      <Route path="/promotion-codes" component={PromotionCodes} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

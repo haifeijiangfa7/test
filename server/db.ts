@@ -15,7 +15,6 @@ import {
   extractedVipAccounts, InsertExtractedVipAccount,
   deletedNormalAccounts, InsertDeletedNormalAccount,
   deletedVipAccounts, InsertDeletedVipAccount,
-  promotionCodes, InsertPromotionCode, PromotionCode,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -33,8 +32,6 @@ export type {
   InsertExtractedVipAccount,
   InsertDeletedNormalAccount,
   InsertDeletedVipAccount,
-  InsertPromotionCode,
-  PromotionCode,
 };
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -479,129 +476,4 @@ export async function getVipAccountStockByEmail(email: string) {
   if (!db) return null;
   const result = await db.select().from(vipAccountStock).where(eq(vipAccountStock.email, email)).limit(1);
   return result[0] || null;
-}
-
-
-// ==================== 兑换码相关函数 ====================
-
-/**
- * 获取所有兑换码
- */
-export async function getAllPromotionCodes() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(promotionCodes).orderBy(desc(promotionCodes.createdAt));
-}
-
-/**
- * 根据code获取兑换码
- */
-export async function getPromotionCodeByCode(code: string) {
-  const db = await getDb();
-  if (!db) return null;
-  const result = await db.select().from(promotionCodes).where(eq(promotionCodes.code, code)).limit(1);
-  return result[0] || null;
-}
-
-/**
- * 批量导入兑换码（自动去重）
- */
-export async function importPromotionCodes(codes: string[]) {
-  const db = await getDb();
-  if (!db) return { imported: 0, duplicates: 0 };
-  
-  let imported = 0;
-  let duplicates = 0;
-  
-  for (const code of codes) {
-    const trimmedCode = code.trim();
-    if (!trimmedCode) continue;
-    
-    // 检查是否已存在
-    const existing = await getPromotionCodeByCode(trimmedCode);
-    if (existing) {
-      duplicates++;
-      continue;
-    }
-    
-    // 插入新兑换码
-    await db.insert(promotionCodes).values({
-      code: trimmedCode,
-      status: "available",
-    });
-    imported++;
-  }
-  
-  return { imported, duplicates };
-}
-
-/**
- * 删除兑换码
- */
-export async function deletePromotionCode(id: number) {
-  const db = await getDb();
-  if (!db) return false;
-  await db.delete(promotionCodes).where(eq(promotionCodes.id, id));
-  return true;
-}
-
-/**
- * 随机获取一个可用的兑换码
- */
-export async function getRandomPromotionCode() {
-  const db = await getDb();
-  if (!db) return null;
-  
-  // 获取所有可用的兑换码
-  const availableCodes = await db.select().from(promotionCodes).where(eq(promotionCodes.status, "available"));
-  
-  if (availableCodes.length === 0) return null;
-  
-  // 随机选择一个
-  const randomIndex = Math.floor(Math.random() * availableCodes.length);
-  return availableCodes[randomIndex];
-}
-
-/**
- * 标记兑换码已使用（但不改变状态，允许循环使用）
- */
-export async function markPromotionCodeUsed(
-  id: number, 
-  accountId: number, 
-  accountType: "normal" | "vip",
-  email: string,
-  creditsBefore: number,
-  creditsAfter: number
-) {
-  const db = await getDb();
-  if (!db) return false;
-  
-  await db.update(promotionCodes)
-    .set({
-      usedByAccountId: accountId,
-      usedByAccountType: accountType,
-      usedByEmail: email,
-      usedAt: new Date(),
-      creditsBefore,
-      creditsAfter,
-      // 不改变status，允许循环使用
-    })
-    .where(eq(promotionCodes.id, id));
-  
-  return true;
-}
-
-/**
- * 获取兑换码统计
- */
-export async function getPromotionCodeStats() {
-  const db = await getDb();
-  if (!db) return { total: 0, available: 0, used: 0 };
-  
-  const all = await db.select().from(promotionCodes);
-  const total = all.length;
-  const available = all.filter(c => c.status === "available").length;
-  const used = all.filter(c => c.usedAt !== null).length;
-  
-  return { total, available, used };
 }
