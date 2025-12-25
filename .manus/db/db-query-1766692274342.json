@@ -1,0 +1,29 @@
+{
+  "query": "SHOW CREATE TABLE promotion_codes;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SHOW CREATE TABLE promotion_codes;",
+  "rows": [
+    {
+      "Table": "promotion_codes",
+      "Create Table": "CREATE TABLE `promotion_codes` ("
+    }
+  ],
+  "messages": [
+    "  `id` int(11) NOT NULL AUTO_INCREMENT,",
+    "  `code` varchar(100) NOT NULL,",
+    "  `status` enum('available','used','invalid') NOT NULL DEFAULT 'available',",
+    "  `usedByAccountId` int(11) DEFAULT NULL,",
+    "  `usedByAccountType` enum('normal','vip') DEFAULT NULL,",
+    "  `usedByEmail` varchar(320) DEFAULT NULL,",
+    "  `usedAt` timestamp NULL DEFAULT NULL,",
+    "  `creditsBefore` int(11) DEFAULT NULL,",
+    "  `creditsAfter` int(11) DEFAULT NULL,",
+    "  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,",
+    "  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,",
+    "  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,",
+    "  UNIQUE KEY `code` (`code`)",
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin AUTO_INCREMENT=30001"
+  ],
+  "stdout": "Table\tCreate Table\npromotion_codes\tCREATE TABLE `promotion_codes` (\n  `id` int(11) NOT NULL AUTO_INCREMENT,\n  `code` varchar(100) NOT NULL,\n  `status` enum('available','used','invalid') NOT NULL DEFAULT 'available',\n  `usedByAccountId` int(11) DEFAULT NULL,\n  `usedByAccountType` enum('normal','vip') DEFAULT NULL,\n  `usedByEmail` varchar(320) DEFAULT NULL,\n  `usedAt` timestamp NULL DEFAULT NULL,\n  `creditsBefore` int(11) DEFAULT NULL,\n  `creditsAfter` int(11) DEFAULT NULL,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `code` (`code`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin AUTO_INCREMENT=30001\n",
+  "stderr": "",
+  "execution_time_ms": 50
+}

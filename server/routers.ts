@@ -6,57 +6,10 @@ import { z } from "zod";
 import * as db from "./db";
 import * as manusApi from "./manusApi";
 
-// 本地管理员账号配置
-const ADMIN_USERNAME = "admin";
-const ADMIN_PASSWORD = "Asd123456.";
-
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    login: publicProcedure
-      .input(z.object({ username: z.string(), password: z.string() }))
-      .mutation(async ({ input, ctx }) => {
-        if (input.username !== ADMIN_USERNAME || input.password !== ADMIN_PASSWORD) {
-          throw new Error("用户名或密码错误");
-        }
-        
-        // 创建或获取管理员用户
-        const adminOpenId = "local-admin-user";
-        let user = await db.getUserByOpenId(adminOpenId);
-        if (!user) {
-          await db.upsertUser({
-            openId: adminOpenId,
-            name: "Admin",
-            email: "admin@local",
-            loginMethod: "password",
-            lastSignedIn: new Date(),
-          });
-          user = await db.getUserByOpenId(adminOpenId);
-        } else {
-          await db.upsertUser({
-            openId: adminOpenId,
-            lastSignedIn: new Date(),
-          });
-        }
-        
-        // 创建本地session token
-        const { SignJWT } = await import("jose");
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET || "default-secret");
-        const token = await new SignJWT({
-          openId: adminOpenId,
-          appId: "local",
-          name: "Admin",
-        })
-          .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-          .setExpirationTime(Math.floor((Date.now() + 365 * 24 * 60 * 60 * 1000) / 1000))
-          .sign(secret);
-        
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
-        
-        return { success: true, user };
-      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -1318,46 +1271,26 @@ export const appRouter = router({
       return await db.getAllPromotionCodes();
     }),
 
+    stats: publicProcedure.query(async () => {
+      return await db.getPromotionCodeStats();
+    }),
+
     import: publicProcedure
-      .input(z.object({ data: z.string() }))
+      .input(z.object({ codes: z.string() }))
       .mutation(async ({ input }) => {
-        const lines = input.data.trim().split('\n').filter(line => line.trim());
-        const results = { success: 0, duplicates: 0 };
-
-        for (const line of lines) {
-          const code = line.trim();
-          if (!code) continue;
-
-          const existing = await db.getPromotionCodeByCode(code);
-          if (existing) {
-            results.duplicates++;
-            continue;
-          }
-
-          await db.createPromotionCode({ code });
-          results.success++;
-        }
-
-        return results;
+        const codeList = input.codes.trim().split('\n').filter(c => c.trim());
+        return await db.importPromotionCodes(codeList);
       }),
 
     delete: publicProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await db.deletePromotionCode(input.id);
-        return { success: true };
+        return await db.deletePromotionCode(input.id);
       }),
 
     getRandom: publicProcedure.query(async () => {
       return await db.getRandomPromotionCode();
     }),
-
-    markUsed: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.markPromotionCodeUsed(input.id);
-        return { success: true };
-      }),
   }),
 });
 

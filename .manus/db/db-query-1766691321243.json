@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS `promotion_codes` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `code` varchar(100) NOT NULL,\n  `usedCount` int NOT NULL DEFAULT 0,\n  `lastUsedAt` timestamp,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `promotion_codes_id` PRIMARY KEY(`id`),\n  CONSTRAINT `promotion_codes_code_unique` UNIQUE(`code`)\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute CREATE TABLE IF NOT EXISTS `promotion_codes` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `code` varchar(100) NOT NULL,\n  `usedCount` int NOT NULL DEFAULT 0,\n  `lastUsedAt` timestamp,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `promotion_codes_id` PRIMARY KEY(`id`),\n  CONSTRAINT `promotion_codes_code_unique` UNIQUE(`code`)\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 54
-}

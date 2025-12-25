@@ -316,9 +316,15 @@ export type InsertDeletedVipAccount = typeof deletedVipAccounts.$inferInsert;
 export const promotionCodes = mysqlTable("promotion_codes", {
   id: int("id").autoincrement().primaryKey(),
   code: varchar("code", { length: 100 }).notNull().unique(),
-  usedCount: int("usedCount").default(0).notNull(),
-  lastUsedAt: timestamp("lastUsedAt"),
+  status: mysqlEnum("status", ["available", "used", "invalid"]).default("available").notNull(),
+  usedByAccountId: int("usedByAccountId"),
+  usedByAccountType: mysqlEnum("usedByAccountType", ["normal", "vip"]),
+  usedByEmail: varchar("usedByEmail", { length: 320 }),
+  usedAt: timestamp("usedAt"),
+  creditsBefore: int("creditsBefore"),
+  creditsAfter: int("creditsAfter"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type PromotionCode = typeof promotionCodes.$inferSelect;

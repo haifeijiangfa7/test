@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "e4bb9984-51dc-4119-a7cc-048151dd4472",
+  "id": "cedbcd9c-f6c8-4599-8a94-4d8b044fd270",
   "prevId": "c211f7d8-9cc3-4534-886d-4e9c7edc16e6",
   "tables": {
     "accounts": {
@@ -1118,17 +1118,52 @@
           "notNull": true,
           "autoincrement": false
         },
-        "usedCount": {
-          "name": "usedCount",
-          "type": "int",
+        "status": {
+          "name": "status",
+          "type": "enum('available','used','invalid')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": "'available'"
         },
-        "lastUsedAt": {
-          "name": "lastUsedAt",
+        "usedByAccountId": {
+          "name": "usedByAccountId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "usedByAccountType": {
+          "name": "usedByAccountType",
+          "type": "enum('normal','vip')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "usedByEmail": {
+          "name": "usedByEmail",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "usedAt": {
+          "name": "usedAt",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creditsBefore": {
+          "name": "creditsBefore",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creditsAfter": {
+          "name": "creditsAfter",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1139,6 +1174,15 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
           "default": "(now())"
         }
       },
