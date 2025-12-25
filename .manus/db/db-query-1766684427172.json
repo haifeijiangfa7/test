@@ -1,0 +1,25 @@
+{
+  "query": "SELECT * FROM invitation_logs WHERE inviteeEmail LIKE '%alisontianvi%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SELECT * FROM invitation_logs WHERE inviteeEmail LIKE '%alisontianvi%';",
+  "rows": [
+    {
+      "id": "30001",
+      "inviterAccountId": "1",
+      "inviterEmail": "shevitzpitassi54249@hotmail.com",
+      "inviteCode": "UUME2RPA8KGXJ6",
+      "inviteeId": "30005",
+      "inviteeEmail": "alisontianvi2195@hotmail.com",
+      "status": "success",
+      "errorMessage": "NULL",
+      "inviterCreditsBefore": "NULL",
+      "inviterCreditsAfter": "NULL",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 17:24:06"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tinviterAccountId\tinviterEmail\tinviteCode\tinviteeId\tinviteeEmail\tstatus\terrorMessage\tinviterCreditsBefore\tinviterCreditsAfter\tinviteeCreditsBefore\tinviteeCreditsAfter\tcreatedAt\n30001\t1\tshevitzpitassi54249@hotmail.com\tUUME2RPA8KGXJ6\t30005\talisontianvi2195@hotmail.com\tsuccess\tNULL\tNULL\tNULL\t1000\t1500\t2025-12-25 17:24:06\n",
+  "stderr": "",
+  "execution_time_ms": 52
+}

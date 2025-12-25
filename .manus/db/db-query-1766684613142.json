@@ -1,0 +1,9 @@
+{
+  "query": "SELECT i.id, i.email, i.freeCredits, i.inviteStatus \nFROM invitees i \nWHERE i.freeCredits >= 1500 \nAND i.email NOT IN (SELECT email FROM normal_account_stock);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SELECT i.id, i.email, i.freeCredits, i.inviteStatus \nFROM invitees i \nWHERE i.freeCredits >= 1500 \nAND i.email NOT IN (SELECT email FROM normal_account_stock);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 51
+}

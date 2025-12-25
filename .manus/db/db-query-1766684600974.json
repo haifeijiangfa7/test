@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO normal_account_stock (email, password, token, clientId, credits, creditCategory, createdAt) \nSELECT email, password, token, clientId, freeCredits, '1500', NOW() \nFROM invitees WHERE email = 'alisontianvi2195@hotmail.com';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute INSERT INTO normal_account_stock (email, password, token, clientId, credits, creditCategory, createdAt) \nSELECT email, password, token, clientId, freeCredits, '1500', NOW() \nFROM invitees WHERE email = 'alisontianvi2195@hotmail.com';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 115
+}

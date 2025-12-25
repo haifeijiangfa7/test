@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, email, credits, creditCategory FROM normal_account_stock WHERE email LIKE '%alisontianvi%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SELECT id, email, credits, creditCategory FROM normal_account_stock WHERE email LIKE '%alisontianvi%';",
+  "rows": [
+    {
+      "id": "30004",
+      "email": "alisontianvi2195@hotmail.com",
+      "credits": "1500",
+      "creditCategory": "1500"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tcredits\tcreditCategory\n30004\talisontianvi2195@hotmail.com\t1500\t1500\n",
+  "stderr": "",
+  "execution_time_ms": 51
+}

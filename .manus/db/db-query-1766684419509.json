@@ -1,0 +1,52 @@
+{
+  "query": "SELECT id, email, freeCredits, inviteStatus, createdAt FROM invitees ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SELECT id, email, freeCredits, inviteStatus, createdAt FROM invitees ORDER BY id;",
+  "rows": [
+    {
+      "id": "4",
+      "email": "hutterchidi86258@hotmail.com",
+      "freeCredits": "1000",
+      "inviteStatus": "pending",
+      "createdAt": "2025-12-25 16:21:18"
+    },
+    {
+      "id": "5",
+      "email": "LaurindaMalo6039@outlook.com",
+      "freeCredits": "1000",
+      "inviteStatus": "pending",
+      "createdAt": "2025-12-25 16:21:18"
+    },
+    {
+      "id": "30001",
+      "email": "KanokoAnneMe8797@hotmail.com",
+      "freeCredits": "1000",
+      "inviteStatus": "pending",
+      "createdAt": "2025-12-25 17:23:42"
+    },
+    {
+      "id": "30003",
+      "email": "JillCarley4689@hotmail.com",
+      "freeCredits": "1000",
+      "inviteStatus": "pending",
+      "createdAt": "2025-12-25 17:23:43"
+    },
+    {
+      "id": "30004",
+      "email": "lailadomenic8282@hotmail.com",
+      "freeCredits": "1000",
+      "inviteStatus": "pending",
+      "createdAt": "2025-12-25 17:23:43"
+    },
+    {
+      "id": "30005",
+      "email": "alisontianvi2195@hotmail.com",
+      "freeCredits": "1500",
+      "inviteStatus": "pending",
+      "createdAt": "2025-12-25 17:23:44"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tfreeCredits\tinviteStatus\tcreatedAt\n4\thutterchidi86258@hotmail.com\t1000\tpending\t2025-12-25 16:21:18\n5\tLaurindaMalo6039@outlook.com\t1000\tpending\t2025-12-25 16:21:18\n30001\tKanokoAnneMe8797@hotmail.com\t1000\tpending\t2025-12-25 17:23:42\n30003\tJillCarley4689@hotmail.com\t1000\tpending\t2025-12-25 17:23:43\n30004\tlailadomenic8282@hotmail.com\t1000\tpending\t2025-12-25 17:23:43\n30005\talisontianvi2195@hotmail.com\t1500\tpending\t2025-12-25 17:23:44\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

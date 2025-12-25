@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, inviterEmail, inviteCode, inviteeEmail, status, inviteeCreditsBefore, inviteeCreditsAfter, createdAt FROM invitation_logs ORDER BY createdAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SELECT id, inviterEmail, inviteCode, inviteeEmail, status, inviteeCreditsBefore, inviteeCreditsAfter, createdAt FROM invitation_logs ORDER BY createdAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "30003",
+      "inviterEmail": "chiaragracie5595@outlook.com",
+      "inviteCode": "BNHYEUCAASGF",
+      "inviteeEmail": "placidavgkri6407@hotmail.com",
+      "status": "success",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 17:35:44"
+    },
+    {
+      "id": "30002",
+      "inviterEmail": "chiaragracie5595@outlook.com",
+      "inviteCode": "BNHYEUCAASGF",
+      "inviteeEmail": "Kathy6824Susana@hotmail.com",
+      "status": "success",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 17:35:43"
+    },
+    {
+      "id": "30001",
+      "inviterEmail": "shevitzpitassi54249@hotmail.com",
+      "inviteCode": "UUME2RPA8KGXJ6",
+      "inviteeEmail": "alisontianvi2195@hotmail.com",
+      "status": "success",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 17:24:06"
+    },
+    {
+      "id": "3",
+      "inviterEmail": "shevitzpitassi54249@hotmail.com",
+      "inviteCode": "UUME2RPA8KGXJ6",
+      "inviteeEmail": "aoimariaasu3702@outlook.com",
+      "status": "success",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 17:01:23"
+    },
+    {
+      "id": "2",
+      "inviterEmail": "shevitzpitassi54249@hotmail.com",
+      "inviteCode": "UUME2RPA8KGXJ6",
+      "inviteeEmail": "akhmedov71838@hotmail.com",
+      "status": "success",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 16:47:43"
+    },
+    {
+      "id": "1",
+      "inviterEmail": "",
+      "inviteCode": "VNYCPDADR0KVINI",
+      "inviteeEmail": "nagakohelle5294@outlook.com",
+      "status": "success",
+      "inviteeCreditsBefore": "1000",
+      "inviteeCreditsAfter": "1500",
+      "createdAt": "2025-12-25 16:47:40"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tinviterEmail\tinviteCode\tinviteeEmail\tstatus\tinviteeCreditsBefore\tinviteeCreditsAfter\tcreatedAt\n30003\tchiaragracie5595@outlook.com\tBNHYEUCAASGF\tplacidavgkri6407@hotmail.com\tsuccess\t1000\t1500\t2025-12-25 17:35:44\n30002\tchiaragracie5595@outlook.com\tBNHYEUCAASGF\tKathy6824Susana@hotmail.com\tsuccess\t1000\t1500\t2025-12-25 17:35:43\n30001\tshevitzpitassi54249@hotmail.com\tUUME2RPA8KGXJ6\talisontianvi2195@hotmail.com\tsuccess\t1000\t1500\t2025-12-25 17:24:06\n3\tshevitzpitassi54249@hotmail.com\tUUME2RPA8KGXJ6\taoimariaasu3702@outlook.com\tsuccess\t1000\t1500\t2025-12-25 17:01:23\n2\tshevitzpitassi54249@hotmail.com\tUUME2RPA8KGXJ6\takhmedov71838@hotmail.com\tsuccess\t1000\t1500\t2025-12-25 16:47:43\n1\t\tVNYCPDADR0KVINI\tnagakohelle5294@outlook.com\tsuccess\t1000\t1500\t2025-12-25 16:47:40\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

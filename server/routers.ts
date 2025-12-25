@@ -832,8 +832,9 @@ export const appRouter = router({
                 completed++;
                 inviteeEmailsList.push(invitee.email); // 记录被邀请者邮箱
                 const newCredits = creditsAfter.freeCredits || 0;
-                // 积分达到1500就添加到库存（邀请成功后从1000变为1500）
+                // 积分达到1500就添加到库存和accounts表（邀请成功后从1000变为1500）
                 if (newCredits >= 1500) {
+                  // 添加到库存表
                   await db.createNormalAccountStock({
                     email: invitee.email,
                     password: invitee.password,
@@ -841,6 +842,36 @@ export const appRouter = router({
                     clientId: invitee.clientId,
                     credits: newCredits,
                     creditCategory: manusApi.getCreditCategory(newCredits),
+                  });
+                  // 同时添加到accounts表，作为新的邀请者账号
+                  // 获取该账号的完整信息
+                  const inviteeUserInfo = await manusApi.getUserInfo(invitee.token, invitee.clientId);
+                  const inviteeCreditsInfo = await manusApi.getCredits(invitee.token, invitee.clientId);
+                  const inviteeCodesInfo = await manusApi.getInvitationCodes(invitee.token, invitee.clientId);
+                  const inviteeInviteCode = inviteeCodesInfo.invitationCodes?.[0]?.inviteCode || '';
+                  const inviteeInviteUsedCount = inviteeCodesInfo.invitationCodes?.[0]?.usedCount || 0;
+                  const tokenInfo = manusApi.parseToken(invitee.token);
+                  
+                  await db.createAccount({
+                    email: invitee.email,
+                    password: invitee.password,
+                    token: invitee.token,
+                    clientId: invitee.clientId,
+                    userId: inviteeUserInfo.userId,
+                    username: inviteeUserInfo.displayname || inviteeUserInfo.nickname || invitee.email.split('@')[0],
+                    tokenIssuedAt: tokenInfo?.issuedAt,
+                    tokenExpiresAt: tokenInfo?.expiresAt,
+                    uid: inviteeUserInfo.uid,
+                    membershipVersion: inviteeUserInfo.membershipVersion || 'free',
+                    totalCredits: inviteeCreditsInfo.totalCredits,
+                    freeCredits: inviteeCreditsInfo.freeCredits,
+                    refreshCredits: inviteeCreditsInfo.refreshCredits,
+                    inviteCode: inviteeInviteCode,
+                    inviteUsedCount: inviteeInviteUsedCount,
+                    isBlocked: false,
+                    smsVerified: inviteeUserInfo.smsVerified || false,
+                    registeredAt: inviteeUserInfo.registeredAt ? new Date(inviteeUserInfo.registeredAt) : new Date(),
+                    lastCheckedAt: new Date(),
                   });
                   await db.deleteInvitee(invitee.id);
                 } else {

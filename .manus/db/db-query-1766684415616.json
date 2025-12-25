@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, email, freeCredits, inviteStatus FROM invitees WHERE email LIKE '%alisontianvi%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute SELECT id, email, freeCredits, inviteStatus FROM invitees WHERE email LIKE '%alisontianvi%';",
+  "rows": [
+    {
+      "id": "30005",
+      "email": "alisontianvi2195@hotmail.com",
+      "freeCredits": "1500",
+      "inviteStatus": "pending"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tfreeCredits\tinviteStatus\n30005\talisontianvi2195@hotmail.com\t1500\tpending\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}
