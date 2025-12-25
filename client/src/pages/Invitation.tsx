@@ -19,7 +19,7 @@ export default function Invitation() {
 
   const utils = trpc.useUtils();
   const { data: eligibleInvitees, isLoading: inviteesLoading } = trpc.invitees.eligible.useQuery({ limit: 100 });
-  const { data: accounts } = trpc.accounts.available.useQuery();
+  const { data: accounts } = trpc.accounts.list.useQuery();
   const { data: inviteeCountData } = trpc.invitees.count.useQuery();
   const { data: stats } = trpc.stats.get.useQuery();
 
