@@ -829,16 +829,25 @@ export const appRouter = router({
 
               if (success) {
                 completed++;
-                // 转移被邀请账号到库存
-                await db.createNormalAccountStock({
-                  email: invitee.email,
-                  password: invitee.password,
-                  token: invitee.token,
-                  clientId: invitee.clientId,
-                  credits: creditsAfter.freeCredits || 0,
-                  creditCategory: manusApi.getCreditCategory(creditsAfter.freeCredits || 0),
-                });
-                await db.deleteInvitee(invitee.id);
+                const newCredits = creditsAfter.freeCredits || 0;
+                // 只有积分达到1800才添加到库存
+                if (newCredits >= 1800) {
+                  await db.createNormalAccountStock({
+                    email: invitee.email,
+                    password: invitee.password,
+                    token: invitee.token,
+                    clientId: invitee.clientId,
+                    credits: newCredits,
+                    creditCategory: manusApi.getCreditCategory(newCredits),
+                  });
+                  await db.deleteInvitee(invitee.id);
+                } else {
+                  // 积分未达到1800，更新被邀请账号的积分信息
+                  await db.updateInvitee(invitee.id, {
+                    freeCredits: newCredits,
+                    lastCheckedAt: new Date(),
+                  });
+                }
               } else {
                 failed++;
               }

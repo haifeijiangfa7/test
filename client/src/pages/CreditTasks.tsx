@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Play, Trash2, Link, User, Crown, Hash } from "lucide-react";
+import { Play, Trash2, Link, User, Crown, Hash, AlertTriangle } from "lucide-react";
+
+// 积分分类：从1800开始，每次+500
+const CREDIT_CATEGORIES = [1800, 2300, 2800, 3300, 3800, 4300, 4800, 5300];
+
+// 根据积分值获取分类
+const getCreditCategory = (credits: number): number => {
+  // 向下取整到最近的分类
+  for (let i = CREDIT_CATEGORIES.length - 1; i >= 0; i--) {
+    if (credits >= CREDIT_CATEGORIES[i]) {
+      return CREDIT_CATEGORIES[i];
+    }
+  }
+  return 0; // 小于1800的账号不在分类中
+};
 
 export default function CreditTasks() {
   const [activeTab, setActiveTab] = useState("invite_only");
@@ -20,29 +35,67 @@ export default function CreditTasks() {
   const [inviteCount, setInviteCount] = useState("1");
   
   // 普通账号模式
-  const [normalAccountId, setNormalAccountId] = useState("random");
-  const [normalTargetCredits, setNormalTargetCredits] = useState("2500");
-  const [normalCustomCredits, setNormalCustomCredits] = useState("");
+  const [normalSourceCategory, setNormalSourceCategory] = useState(""); // 账号来源分类
+  const [normalTargetCredits, setNormalTargetCredits] = useState("2300"); // 目标积分
   const [normalMakeCount, setNormalMakeCount] = useState("1");
   
   // 会员账号模式
-  const [vipAccountId, setVipAccountId] = useState("random");
-  const [vipTargetCredits, setVipTargetCredits] = useState("2500");
-  const [vipCustomCredits, setVipCustomCredits] = useState("");
+  const [vipSourceCategory, setVipSourceCategory] = useState(""); // 账号来源分类
+  const [vipTargetCredits, setVipTargetCredits] = useState("2300"); // 目标积分
   const [vipMakeCount, setVipMakeCount] = useState("1");
+
+  // 警告弹窗
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
 
   const utils = trpc.useUtils();
   const { data: tasks, isLoading } = trpc.creditTasks.list.useQuery();
-  const { data: accounts } = trpc.accounts.available.useQuery();
-  const { data: vipAccounts } = trpc.vipAccounts.available.useQuery();
+  const { data: accounts } = trpc.accounts.list.useQuery();
+  const { data: vipAccounts } = trpc.vipAccounts.list.useQuery();
   const { data: inviteeCount } = trpc.invitees.count.useQuery();
+
+  // 按积分分类统计普通账号
+  const normalAccountsByCategory = useMemo(() => {
+    const categories: Record<number, NonNullable<typeof accounts>> = {};
+    accounts?.forEach(account => {
+      const category = getCreditCategory(account.totalCredits || 0);
+      if (category > 0) {
+        if (!categories[category]) categories[category] = [];
+        categories[category]!.push(account);
+      }
+    });
+    return categories;
+  }, [accounts]);
+
+  // 按积分分类统计会员账号
+  const vipAccountsByCategory = useMemo(() => {
+    const categories: Record<number, NonNullable<typeof vipAccounts>> = {};
+    vipAccounts?.forEach(account => {
+      const category = getCreditCategory(account.totalCredits || 0);
+      if (category > 0) {
+        if (!categories[category]) categories[category] = [];
+        categories[category]!.push(account);
+      }
+    });
+    return categories;
+  }, [vipAccounts]);
+
+  // 获取可选的账号来源分类（必须小于目标积分）
+  const getAvailableSourceCategories = (targetCredits: number, accountsByCategory: Record<number, any[]>) => {
+    return CREDIT_CATEGORIES.filter(cat => cat < targetCredits && accountsByCategory[cat]?.length > 0);
+  };
+
+  // 计算需要的邀请次数
+  const calculateRequiredInvites = (targetCredits: number, sourceCategory: number) => {
+    return Math.ceil((targetCredits - sourceCategory) / 500);
+  };
 
   const createMutation = trpc.creditTasks.create.useMutation({
     onSuccess: (result) => {
       toast.success(`任务创建成功，需要邀请 ${result.requiredInvites} 次，正在自动执行...`);
       utils.creditTasks.list.invalidate();
-      utils.accounts.available.invalidate();
-      utils.vipAccounts.available.invalidate();
+      utils.accounts.list.invalidate();
+      utils.vipAccounts.list.invalidate();
       utils.stock.normal.list.invalidate();
       utils.stock.vip.list.invalidate();
       // 任务创建成功后自动执行
@@ -98,115 +151,124 @@ export default function CreditTasks() {
       code = match[1];
     }
 
+    const requiredInvites = parseInt(inviteCount);
+    if ((inviteeCount?.count || 0) < requiredInvites) {
+      setWarningMessage(`被邀请账号不足！需要 ${requiredInvites} 个，当前只有 ${inviteeCount?.count || 0} 个`);
+      setShowWarning(true);
+      return;
+    }
+
     createMutation.mutate({
       mode: "invite_only",
       targetInviteCode: code,
       initialCredits: 0,
-      targetCredits: parseInt(inviteCount) * 500,
+      targetCredits: requiredInvites * 500,
     });
   };
 
   const handleCreateNormalAccount = () => {
     const makeCount = parseInt(normalMakeCount) || 1;
-    
-    if (normalAccountId === "random") {
-      // 随机模式：创建多个任务
-      for (let i = 0; i < makeCount; i++) {
-        const randomAccount = accounts?.[Math.floor(Math.random() * (accounts?.length || 0))];
-        if (!randomAccount || !randomAccount.inviteCode) {
-          toast.error("没有可用的普通账号或账号没有邀请码");
-          return;
-        }
-        
-        createMutation.mutate({
-          mode: "normal_account",
-          targetInviteCode: randomAccount.inviteCode,
-          targetAccountId: randomAccount.id,
-          targetEmail: randomAccount.email,
-          targetPassword: randomAccount.password,
-          initialCredits: randomAccount.totalCredits || 0,
-          targetCredits: getNormalTargetCreditsValue(),
-        });
-      }
-    } else {
-      // 指定账号模式
-      const account = accounts?.find(a => a.id.toString() === normalAccountId);
-      if (!account || !account.inviteCode) {
-        toast.error("所选账号没有邀请码");
-        return;
+    const targetCredits = parseInt(normalTargetCredits);
+    const sourceCategory = parseInt(normalSourceCategory);
+
+    if (!normalSourceCategory) {
+      toast.error("请选择账号来源分类");
+      return;
+    }
+
+    const availableAccounts = normalAccountsByCategory[sourceCategory] || [];
+    if (availableAccounts.length === 0) {
+      toast.error("所选分类没有可用账号");
+      return;
+    }
+
+    if (availableAccounts.length < makeCount) {
+      setWarningMessage(`所选分类账号不足！需要 ${makeCount} 个，当前只有 ${availableAccounts.length} 个`);
+      setShowWarning(true);
+      return;
+    }
+
+    const requiredInvitesPerAccount = calculateRequiredInvites(targetCredits, sourceCategory);
+    const totalRequiredInvites = requiredInvitesPerAccount * makeCount;
+
+    if ((inviteeCount?.count || 0) < totalRequiredInvites) {
+      setWarningMessage(`被邀请账号不足！需要 ${totalRequiredInvites} 个，当前只有 ${inviteeCount?.count || 0} 个`);
+      setShowWarning(true);
+      return;
+    }
+
+    // 随机选择账号
+    const shuffled = [...availableAccounts].sort(() => Math.random() - 0.5);
+    const selectedAccounts = shuffled.slice(0, makeCount);
+
+    for (const account of selectedAccounts) {
+      if (!account.inviteCode) {
+        toast.error(`账号 ${account.email} 没有邀请码，请先刷新获取`);
+        continue;
       }
 
-      for (let i = 0; i < makeCount; i++) {
-        createMutation.mutate({
-          mode: "normal_account",
-          targetInviteCode: account.inviteCode,
-          targetAccountId: account.id,
-          targetEmail: account.email,
-          targetPassword: account.password,
-          initialCredits: account.totalCredits || 0,
-          targetCredits: getNormalTargetCreditsValue(),
-        });
-      }
+      createMutation.mutate({
+        mode: "normal_account",
+        targetInviteCode: account.inviteCode,
+        targetAccountId: account.id,
+        targetEmail: account.email,
+        targetPassword: account.password,
+        initialCredits: account.totalCredits || 0,
+        targetCredits: targetCredits,
+      });
     }
-  };
-
-  // 获取普通账号模式的实际目标积分值
-  const getNormalTargetCreditsValue = () => {
-    if (normalTargetCredits === "custom") {
-      return parseInt(normalCustomCredits) || 2500;
-    }
-    return parseInt(normalTargetCredits);
-  };
-
-  // 获取会员账号模式的实际目标积分值
-  const getVipTargetCreditsValue = () => {
-    if (vipTargetCredits === "custom") {
-      return parseInt(vipCustomCredits) || 2500;
-    }
-    return parseInt(vipTargetCredits);
   };
 
   const handleCreateVipAccount = () => {
     const makeCount = parseInt(vipMakeCount) || 1;
-    
-    if (vipAccountId === "random") {
-      // 随机模式：创建多个任务
-      for (let i = 0; i < makeCount; i++) {
-        const randomAccount = vipAccounts?.[Math.floor(Math.random() * (vipAccounts?.length || 0))];
-        if (!randomAccount || !randomAccount.inviteCode) {
-          toast.error("没有可用的会员账号或账号没有邀请码");
-          return;
-        }
-        
-        createMutation.mutate({
-          mode: "vip_account",
-          targetInviteCode: randomAccount.inviteCode,
-          targetAccountId: randomAccount.id,
-          targetEmail: randomAccount.email,
-          targetPassword: randomAccount.password,
-          initialCredits: randomAccount.totalCredits || 0,
-          targetCredits: getVipTargetCreditsValue(),
-        });
-      }
-    } else {
-      // 指定账号模式
-      const account = vipAccounts?.find(a => a.id.toString() === vipAccountId);
-      if (!account || !account.inviteCode) {
-        toast.error("所选账号没有邀请码");
-        return;
+    const targetCredits = parseInt(vipTargetCredits);
+    const sourceCategory = parseInt(vipSourceCategory);
+
+    if (!vipSourceCategory) {
+      toast.error("请选择账号来源分类");
+      return;
+    }
+
+    const availableAccounts = vipAccountsByCategory[sourceCategory] || [];
+    if (availableAccounts.length === 0) {
+      toast.error("所选分类没有可用账号");
+      return;
+    }
+
+    if (availableAccounts.length < makeCount) {
+      setWarningMessage(`所选分类账号不足！需要 ${makeCount} 个，当前只有 ${availableAccounts.length} 个`);
+      setShowWarning(true);
+      return;
+    }
+
+    const requiredInvitesPerAccount = calculateRequiredInvites(targetCredits, sourceCategory);
+    const totalRequiredInvites = requiredInvitesPerAccount * makeCount;
+
+    if ((inviteeCount?.count || 0) < totalRequiredInvites) {
+      setWarningMessage(`被邀请账号不足！需要 ${totalRequiredInvites} 个，当前只有 ${inviteeCount?.count || 0} 个`);
+      setShowWarning(true);
+      return;
+    }
+
+    // 随机选择账号
+    const shuffled = [...availableAccounts].sort(() => Math.random() - 0.5);
+    const selectedAccounts = shuffled.slice(0, makeCount);
+
+    for (const account of selectedAccounts) {
+      if (!account.inviteCode) {
+        toast.error(`账号 ${account.email} 没有邀请码，请先刷新获取`);
+        continue;
       }
 
-      for (let i = 0; i < makeCount; i++) {
-        createMutation.mutate({
-          mode: "vip_account",
-          targetInviteCode: account.inviteCode,
-          targetAccountId: account.id,
-          targetEmail: account.email,
-          targetPassword: account.password,
-          initialCredits: account.totalCredits || 0,
-          targetCredits: getVipTargetCreditsValue(),
-        });
-      }
+      createMutation.mutate({
+        mode: "vip_account",
+        targetInviteCode: account.inviteCode,
+        targetAccountId: account.id,
+        targetEmail: account.email,
+        targetPassword: account.password,
+        initialCredits: account.totalCredits || 0,
+        targetCredits: targetCredits,
+      });
     }
   };
 
@@ -240,11 +302,27 @@ export default function CreditTasks() {
     }
   };
 
-  // 计算需要的邀请次数
-  const calculateRequiredInvites = (targetCredits: number, initialCredits: number = 0) => {
-    const neededCredits = targetCredits - initialCredits;
-    return Math.ceil(neededCredits / 500);
-  };
+  // 普通账号模式：可选的来源分类
+  const normalAvailableCategories = getAvailableSourceCategories(
+    parseInt(normalTargetCredits) || 2300,
+    normalAccountsByCategory
+  );
+
+  // 会员账号模式：可选的来源分类
+  const vipAvailableCategories = getAvailableSourceCategories(
+    parseInt(vipTargetCredits) || 2300,
+    vipAccountsByCategory
+  );
+
+  // 计算普通账号模式需要的邀请次数
+  const normalRequiredInvites = normalSourceCategory
+    ? calculateRequiredInvites(parseInt(normalTargetCredits), parseInt(normalSourceCategory)) * (parseInt(normalMakeCount) || 1)
+    : 0;
+
+  // 计算会员账号模式需要的邀请次数
+  const vipRequiredInvites = vipSourceCategory
+    ? calculateRequiredInvites(parseInt(vipTargetCredits), parseInt(vipSourceCategory)) * (parseInt(vipMakeCount) || 1)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -252,6 +330,24 @@ export default function CreditTasks() {
         <h1 className="text-2xl font-bold text-gray-900">制作指定积分账号</h1>
         <p className="text-gray-500 mt-1">三种模式制作账号：邀请链接模式、普通账号模式、会员账号模式</p>
       </div>
+
+      {/* 警告弹窗 */}
+      <Dialog open={showWarning} onOpenChange={setShowWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="w-5 h-5" />
+              资源不足
+            </DialogTitle>
+            <DialogDescription>{warningMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWarning(false)}>
+              确定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 统计信息 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -271,7 +367,7 @@ export default function CreditTasks() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">可用普通账号</p>
-                <p className="text-2xl font-bold">{accounts?.length || 0}</p>
+                <p className="text-2xl font-bold">{accounts?.filter(a => a.inviteCode).length || 0}</p>
               </div>
               <Badge className="bg-blue-500">普通</Badge>
             </div>
@@ -282,7 +378,7 @@ export default function CreditTasks() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">可用会员账号</p>
-                <p className="text-2xl font-bold">{vipAccounts?.length || 0}</p>
+                <p className="text-2xl font-bold">{vipAccounts?.filter(a => a.inviteCode).length || 0}</p>
               </div>
               <Badge className="bg-amber-500">会员</Badge>
             </div>
@@ -293,9 +389,9 @@ export default function CreditTasks() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">待执行任务</p>
-                <p className="text-2xl font-bold">{tasks?.filter(t => t.status === 'pending').length || 0}</p>
+                <p className="text-2xl font-bold">{tasks?.filter(t => t.status === "pending").length || 0}</p>
               </div>
-              <Badge className="bg-green-500">任务</Badge>
+              <Badge className="bg-orange-500">任务</Badge>
             </div>
           </CardContent>
         </Card>
@@ -326,7 +422,7 @@ export default function CreditTasks() {
               </CardTitle>
               <CardDescription>
                 只需提供邀请链接，设置邀请次数即可执行邀请。
-                邀请成功后，被邀请账号将自动添加到普通账号库存中。
+                邀请成功后，被邀请账号积分达到1800将自动添加到普通账号库存中。
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -356,6 +452,9 @@ export default function CreditTasks() {
               <p className="text-sm text-gray-500">
                 当前可用被邀请账号: {inviteeCount?.count || 0} 个 | 
                 预计增加积分: {parseInt(inviteCount) * 500}
+                {(inviteeCount?.count || 0) < parseInt(inviteCount) && (
+                  <span className="text-red-500 ml-2">（被邀请账号不足！）</span>
+                )}
               </p>
               <Button 
                 onClick={handleCreateInviteOnly}
@@ -377,62 +476,51 @@ export default function CreditTasks() {
                 普通账号模式
               </CardTitle>
               <CardDescription>
-                选择或随机获取普通账号，通过邀请增加积分到目标值。
-                制作完成后账号将自动更新到库存中。
+                选择账号积分分类，系统将从该分类中随机选择账号进行邀请。
+                账号来源积分必须小于目标积分。制作完成后账号将自动更新到库存中。
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>账号来源</Label>
-                  <Select value={normalAccountId} onValueChange={setNormalAccountId}>
-                    <SelectTrigger className="relative z-10">
-                      <SelectValue placeholder="随机获取" />
+                  <Label>目标积分</Label>
+                  <Select 
+                    value={normalTargetCredits} 
+                    onValueChange={(val) => {
+                      setNormalTargetCredits(val);
+                      setNormalSourceCategory(""); // 重置来源分类
+                    }}
+                  >
+                    <SelectTrigger className="relative z-20">
+                      <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="z-50 max-h-[300px] overflow-y-auto">
-                      <SelectItem value="random">随机获取</SelectItem>
-                      {accounts?.map((account) => (
-                        <SelectItem key={account.id} value={account.id.toString()}>
-                          {account.email} (积分: {account.totalCredits || 0})
+                    <SelectContent className="z-50">
+                      {CREDIT_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat.toString()}>
+                          {cat} 积分
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>目标积分</Label>
-                  <div className="flex gap-2">
-                    <Select value={normalTargetCredits} onValueChange={(val) => {
-                      setNormalTargetCredits(val);
-                      if (val !== "custom") setNormalCustomCredits("");
-                    }}>
-                      <SelectTrigger className={`relative z-10 ${normalTargetCredits === "custom" ? "w-32" : "w-full"}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="1500">1500 积分</SelectItem>
-                        <SelectItem value="2000">2000 积分</SelectItem>
-                        <SelectItem value="2500">2500 积分</SelectItem>
-                        <SelectItem value="3000">3000 积分</SelectItem>
-                        <SelectItem value="3500">3500 积分</SelectItem>
-                        <SelectItem value="4000">4000 积分</SelectItem>
-                        <SelectItem value="4500">4500 积分</SelectItem>
-                        <SelectItem value="5000">5000+ 积分</SelectItem>
-                        <SelectItem value="custom">手动输入</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {normalTargetCredits === "custom" && (
-                      <Input
-                        type="number"
-                        min="500"
-                        step="500"
-                        placeholder="输入积分"
-                        value={normalCustomCredits}
-                        onChange={(e) => setNormalCustomCredits(e.target.value)}
-                        className="flex-1"
-                      />
-                    )}
-                  </div>
+                  <Label>账号来源分类</Label>
+                  <Select value={normalSourceCategory} onValueChange={setNormalSourceCategory}>
+                    <SelectTrigger className="relative z-10">
+                      <SelectValue placeholder="选择积分分类" />
+                    </SelectTrigger>
+                    <SelectContent className="z-50">
+                      {normalAvailableCategories.length === 0 ? (
+                        <SelectItem value="none" disabled>没有可用分类</SelectItem>
+                      ) : (
+                        normalAvailableCategories.map((cat) => (
+                          <SelectItem key={cat} value={cat.toString()}>
+                            {cat}积分账号 ({normalAccountsByCategory[cat]?.length || 0}个)
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>制作个数</Label>
@@ -441,7 +529,7 @@ export default function CreditTasks() {
                     <Input
                       type="number"
                       min="1"
-                      max={accounts?.length || 1}
+                      max={normalSourceCategory ? (normalAccountsByCategory[parseInt(normalSourceCategory)]?.length || 1) : 1}
                       value={normalMakeCount}
                       onChange={(e) => setNormalMakeCount(e.target.value)}
                       className="pl-10"
@@ -449,14 +537,21 @@ export default function CreditTasks() {
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-gray-500">
-                可用普通账号: {accounts?.length || 0} 个 | 
-                可用被邀请账号: {inviteeCount?.count || 0} 个 |
-                需要邀请: {calculateRequiredInvites(getNormalTargetCreditsValue(), 1000) * parseInt(normalMakeCount || "1")} 次
-              </p>
+              <div className="text-sm text-gray-500 space-y-1">
+                <p>
+                  可用分类: {normalAvailableCategories.map(cat => `${cat}积分(${normalAccountsByCategory[cat]?.length || 0}个)`).join(", ") || "无"}
+                </p>
+                <p>
+                  可用被邀请账号: {inviteeCount?.count || 0} 个 |
+                  需要邀请: {normalRequiredInvites} 次
+                  {normalSourceCategory && (inviteeCount?.count || 0) < normalRequiredInvites && (
+                    <span className="text-red-500 ml-2">（被邀请账号不足！）</span>
+                  )}
+                </p>
+              </div>
               <Button 
                 onClick={handleCreateNormalAccount}
-                disabled={createMutation.isPending || (accounts?.length || 0) === 0}
+                disabled={createMutation.isPending || !normalSourceCategory || normalAvailableCategories.length === 0}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
                 <Play className="w-4 h-4 mr-2" />
@@ -474,62 +569,51 @@ export default function CreditTasks() {
                 会员账号模式
               </CardTitle>
               <CardDescription>
-                选择或随机获取会员账号，通过邀请增加积分到目标值。
-                制作完成后账号将自动更新到库存中。
+                选择账号积分分类，系统将从该分类中随机选择会员账号进行邀请。
+                账号来源积分必须小于目标积分。制作完成后账号将自动更新到库存中。
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>账号来源</Label>
-                  <Select value={vipAccountId} onValueChange={setVipAccountId}>
-                    <SelectTrigger className="relative z-10">
-                      <SelectValue placeholder="随机获取" />
+                  <Label>目标积分</Label>
+                  <Select 
+                    value={vipTargetCredits} 
+                    onValueChange={(val) => {
+                      setVipTargetCredits(val);
+                      setVipSourceCategory(""); // 重置来源分类
+                    }}
+                  >
+                    <SelectTrigger className="relative z-20">
+                      <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="z-50 max-h-[300px] overflow-y-auto">
-                      <SelectItem value="random">随机获取</SelectItem>
-                      {vipAccounts?.map((account) => (
-                        <SelectItem key={account.id} value={account.id.toString()}>
-                          {account.email} (积分: {account.totalCredits || 0})
+                    <SelectContent className="z-50">
+                      {CREDIT_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat.toString()}>
+                          {cat} 积分
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>目标积分</Label>
-                  <div className="flex gap-2">
-                    <Select value={vipTargetCredits} onValueChange={(val) => {
-                      setVipTargetCredits(val);
-                      if (val !== "custom") setVipCustomCredits("");
-                    }}>
-                      <SelectTrigger className={`relative z-10 ${vipTargetCredits === "custom" ? "w-32" : "w-full"}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="1500">1500 积分</SelectItem>
-                        <SelectItem value="2000">2000 积分</SelectItem>
-                        <SelectItem value="2500">2500 积分</SelectItem>
-                        <SelectItem value="3000">3000 积分</SelectItem>
-                        <SelectItem value="3500">3500 积分</SelectItem>
-                        <SelectItem value="4000">4000 积分</SelectItem>
-                        <SelectItem value="4500">4500 积分</SelectItem>
-                        <SelectItem value="5000">5000+ 积分</SelectItem>
-                        <SelectItem value="custom">手动输入</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {vipTargetCredits === "custom" && (
-                      <Input
-                        type="number"
-                        min="500"
-                        step="500"
-                        placeholder="输入积分"
-                        value={vipCustomCredits}
-                        onChange={(e) => setVipCustomCredits(e.target.value)}
-                        className="flex-1"
-                      />
-                    )}
-                  </div>
+                  <Label>账号来源分类</Label>
+                  <Select value={vipSourceCategory} onValueChange={setVipSourceCategory}>
+                    <SelectTrigger className="relative z-10">
+                      <SelectValue placeholder="选择积分分类" />
+                    </SelectTrigger>
+                    <SelectContent className="z-50">
+                      {vipAvailableCategories.length === 0 ? (
+                        <SelectItem value="none" disabled>没有可用分类</SelectItem>
+                      ) : (
+                        vipAvailableCategories.map((cat) => (
+                          <SelectItem key={cat} value={cat.toString()}>
+                            {cat}积分账号 ({vipAccountsByCategory[cat]?.length || 0}个)
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>制作个数</Label>
@@ -538,7 +622,7 @@ export default function CreditTasks() {
                     <Input
                       type="number"
                       min="1"
-                      max={vipAccounts?.length || 1}
+                      max={vipSourceCategory ? (vipAccountsByCategory[parseInt(vipSourceCategory)]?.length || 1) : 1}
                       value={vipMakeCount}
                       onChange={(e) => setVipMakeCount(e.target.value)}
                       className="pl-10"
@@ -546,15 +630,22 @@ export default function CreditTasks() {
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-gray-500">
-                可用会员账号: {vipAccounts?.length || 0} 个 | 
-                可用被邀请账号: {inviteeCount?.count || 0} 个 |
-                需要邀请: {calculateRequiredInvites(getVipTargetCreditsValue(), 1000) * parseInt(vipMakeCount || "1")} 次
-              </p>
+              <div className="text-sm text-gray-500 space-y-1">
+                <p>
+                  可用分类: {vipAvailableCategories.map(cat => `${cat}积分(${vipAccountsByCategory[cat]?.length || 0}个)`).join(", ") || "无"}
+                </p>
+                <p>
+                  可用被邀请账号: {inviteeCount?.count || 0} 个 |
+                  需要邀请: {vipRequiredInvites} 次
+                  {vipSourceCategory && (inviteeCount?.count || 0) < vipRequiredInvites && (
+                    <span className="text-red-500 ml-2">（被邀请账号不足！）</span>
+                  )}
+                </p>
+              </div>
               <Button 
                 onClick={handleCreateVipAccount}
-                disabled={createMutation.isPending || (vipAccounts?.length || 0) === 0}
-                className="w-full bg-amber-500 hover:bg-amber-600"
+                disabled={createMutation.isPending || !vipSourceCategory || vipAvailableCategories.length === 0}
+                className="w-full bg-amber-600 hover:bg-amber-700"
               >
                 <Play className="w-4 h-4 mr-2" />
                 {createMutation.isPending ? "创建中..." : `开始制作 (${vipMakeCount}个)`}
@@ -571,86 +662,82 @@ export default function CreditTasks() {
           <CardDescription>查看所有制作任务的状态和进度</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>模式</TableHead>
+                <TableHead>目标账号</TableHead>
+                <TableHead>目标积分</TableHead>
+                <TableHead>进度</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>创建时间</TableHead>
+                <TableHead className="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead>模式</TableHead>
-                  <TableHead>目标账号</TableHead>
-                  <TableHead>目标积分</TableHead>
-                  <TableHead>进度</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>创建时间</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    加载中...
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      加载中...
+              ) : tasks?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    暂无任务
+                  </TableCell>
+                </TableRow>
+              ) : (
+                tasks?.map((task) => (
+                  <TableRow key={task.id}>
+                    <TableCell>{getModeLabel(task.mode)}</TableCell>
+                    <TableCell className="max-w-[150px] truncate">
+                      {task.targetEmail || task.targetInviteCode}
                     </TableCell>
-                  </TableRow>
-                ) : tasks?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      暂无任务
+                    <TableCell>{task.targetCredits}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress 
+                          value={((task.completedInvites || 0) / task.requiredInvites) * 100} 
+                          className="w-20 h-2"
+                        />
+                        <span className="text-sm text-gray-500">
+                          {task.completedInvites || 0}/{task.requiredInvites}
+                        </span>
+                      </div>
                     </TableCell>
-                  </TableRow>
-                ) : (
-                  tasks?.map((task) => (
-                    <TableRow key={task.id}>
-                      <TableCell>{getModeLabel(task.mode)}</TableCell>
-                      <TableCell className="font-medium max-w-[150px] truncate">
-                        {task.targetEmail || task.targetInviteCode}
-                      </TableCell>
-                      <TableCell>{task.targetCredits}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={(task.completedInvites || 0) / task.requiredInvites * 100} 
-                            className="w-20 h-2"
-                          />
-                          <span className="text-sm text-gray-500">
-                            {task.completedInvites || 0}/{task.requiredInvites}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(task.status)}</TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {new Date(task.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {task.status === "pending" && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => executeMutation.mutate({ taskId: task.id })}
-                              disabled={executeMutation.isPending}
-                              title="执行任务"
-                            >
-                              <Play className="w-4 h-4" />
-                            </Button>
-                          )}
+                    <TableCell>{getStatusBadge(task.status)}</TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {new Date(task.createdAt).toLocaleString("zh-CN")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {task.status === "pending" && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => deleteMutation.mutate({ id: task.id })}
-                            disabled={deleteMutation.isPending}
-                            title="删除"
-                            className="text-red-500 hover:text-red-600"
+                            onClick={() => executeMutation.mutate({ taskId: task.id })}
+                            disabled={executeMutation.isPending}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Play className="w-4 h-4" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteMutation.mutate({ id: task.id })}
+                          disabled={deleteMutation.isPending}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

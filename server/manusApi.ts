@@ -245,8 +245,8 @@ export function checkEligibility(userInfo: UserInfoResponse, credits: CreditsRes
 
 // 验证邀请是否成功（通过积分变化判断）
 export function verifyInvitationSuccess(creditsBefore: number, creditsAfter: number): boolean {
-  // 邀请成功后，被邀请者的免费积分从1000变为1500
-  return creditsBefore === 1000 && creditsAfter === 1500;
+  // 邀请成功后，被邀请者的免费积分增加500
+  return creditsAfter === creditsBefore + 500;
 }
 
 // 计算需要的邀请次数
@@ -256,16 +256,17 @@ export function calculateRequiredInvites(currentCredits: number, targetCredits: 
   return Math.ceil(diff / 500);
 }
 
-// 获取积分分类
+// 获取积分分类（从1800开始，每次+500）
 export function getCreditCategory(credits: number): string {
-  if (credits >= 5000) return '5000+';
-  if (credits >= 4500) return '4500';
-  if (credits >= 4000) return '4000';
-  if (credits >= 3500) return '3500';
-  if (credits >= 3000) return '3000';
-  if (credits >= 2500) return '2500';
-  if (credits >= 2000) return '2000';
-  return '1500';
+  if (credits >= 5300) return '5300+';
+  if (credits >= 4800) return '4800';
+  if (credits >= 4300) return '4300';
+  if (credits >= 3800) return '3800';
+  if (credits >= 3300) return '3300';
+  if (credits >= 2800) return '2800';
+  if (credits >= 2300) return '2300';
+  if (credits >= 1800) return '1800';
+  return String(credits); // 小于1800的返回实际积分值
 }
 
 // 从邀请链接中提取邀请码
