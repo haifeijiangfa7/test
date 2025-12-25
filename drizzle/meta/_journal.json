@@ -22,6 +22,13 @@
       "when": 1766683781204,
       "tag": "0002_worthless_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1766695484045,
+      "tag": "0003_common_giant_man",
+      "breakpoints": true
     }
   ]
 }

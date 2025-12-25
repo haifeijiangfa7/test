@@ -19,7 +19,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { 
   LayoutDashboard, 
@@ -30,12 +29,19 @@ import {
   Target, 
   History, 
   Package,
-  FileText
+  FileText,
+  Gift,
+  Lock,
+  User
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "首页", path: "/" },
@@ -45,6 +51,7 @@ const menuItems = [
   { icon: History, label: "邀请记录", path: "/logs" },
   { icon: FileText, label: "制作记录", path: "/account-logs" },
   { icon: Package, label: "账号库存", path: "/account-stock" },
+  { icon: Gift, label: "兑换码管理", path: "/promotion-codes" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -61,7 +68,31 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, refresh } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: () => {
+      toast.success("登录成功");
+      refresh();
+    },
+    onError: (error) => {
+      toast.error(`登录失败: ${error.message}`);
+      setIsLoggingIn(false);
+    },
+  });
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      toast.error("请输入用户名和密码");
+      return;
+    }
+    setIsLoggingIn(true);
+    loginMutation.mutate({ username: username.trim(), password: password.trim() });
+  };
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -80,21 +111,51 @@ export default function DashboardLayout({
               <Users className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-center text-gray-900">
-              Manus账号邀请管理系统
+              账号邀请管理系统
             </h1>
             <p className="text-sm text-gray-500 text-center max-w-sm">
-              请登录以访问账号管理功能
+              请输入用户名和密码登录
             </p>
           </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all bg-blue-600 hover:bg-blue-700"
-          >
-            登录
-          </Button>
+          
+          <form onSubmit={handleLogin} className="w-full space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                用户名
+              </Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="请输入用户名"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoggingIn}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                密码
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="请输入密码"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoggingIn}
+              />
+            </div>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full shadow-lg hover:shadow-xl transition-all bg-blue-600 hover:bg-blue-700"
+              disabled={isLoggingIn}
+            >
+              {isLoggingIn ? "登录中..." : "登录"}
+            </Button>
+          </form>
         </div>
       </div>
     );
@@ -198,84 +259,80 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
-                    >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-blue-600" : ""}`}
-                      />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton
+                    onClick={() => {
+                      setLocation(item.path);
+                      if (isMobile) {
+                        toggleSidebar();
+                      }
+                    }}
+                    isActive={location === item.path}
+                    tooltip={item.label}
+                    className="h-10"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarContent>
 
-          <SidebarFooter className="p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-600">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>退出登录</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton className="h-12">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs bg-blue-100 text-blue-600">
+                          {user?.name?.charAt(0) || "管"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col items-start text-sm leading-tight">
+                        <span className="font-medium truncate">
+                          {user?.name || "管理员"}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {user?.email || "管理员"}
+                        </span>
+                      </div>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="top"
+                    align="start"
+                    className="w-[--radix-dropdown-menu-trigger-width]"
+                  >
+                    <DropdownMenuItem onClick={logout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      退出登录
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
           </SidebarFooter>
         </Sidebar>
-        <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
-          onMouseDown={() => {
-            if (isCollapsed) return;
-            setIsResizing(true);
-          }}
-          style={{ zIndex: 50 }}
-        />
+
+        {!isCollapsed && !isMobile && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500/70 z-10"
+            onMouseDown={() => setIsResizing(true)}
+          />
+        )}
       </div>
 
-      <SidebarInset>
-        {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "菜单"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <main className="flex-1 p-4 bg-gray-50 min-h-screen">{children}</main>
+      <SidebarInset className="flex flex-col">
+        <header className="h-16 flex items-center gap-2 border-b px-4 shrink-0">
+          <SidebarTrigger className="md:hidden" />
+          <h1 className="text-lg font-semibold">
+            {activeMenuItem?.label || "账号管理系统"}
+          </h1>
+        </header>
+        <main className="flex-1 overflow-auto p-4">{children}</main>
       </SidebarInset>
     </>
   );

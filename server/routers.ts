@@ -6,10 +6,26 @@ import { z } from "zod";
 import * as db from "./db";
 import * as manusApi from "./manusApi";
 
+import * as authService from './_core/auth';
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    login: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string() }))
+      .mutation(({ input, ctx }) => {
+        const result = authService.validateLogin(input.username, input.password);
+        if (result.success && result.token) {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, result.token, {
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          });
+          return { success: true, user: result.user };
+        }
+        throw new Error(result.error || '登录失败');
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -1262,6 +1278,203 @@ export const appRouter = router({
         } catch (error: any) {
           throw new Error(`获取邀请码失败: ${error.message}`);
         }
+      }),
+  }),
+
+  // ============ 兑换码管理 ============
+  promotionCodes: router({
+    list: publicProcedure.query(async () => {
+      return await db.getAllPromotionCodes();
+    }),
+
+    available: publicProcedure.query(async () => {
+      return await db.getAvailablePromotionCodes();
+    }),
+
+    stats: publicProcedure.query(async () => {
+      return await db.getPromotionCodeStats();
+    }),
+
+    import: publicProcedure
+      .input(z.object({ codes: z.string() }))
+      .mutation(async ({ input }) => {
+        const lines = input.codes.trim().split('\n').filter(line => line.trim());
+        const results = { success: 0, failed: 0, errors: [] as string[] };
+
+        for (const line of lines) {
+          const code = line.trim();
+          if (!code) continue;
+
+          const existing = await db.getPromotionCodeByCode(code);
+          if (existing) {
+            results.failed++;
+            results.errors.push(`兑换码已存在: ${code}`);
+            continue;
+          }
+
+          await db.createPromotionCode({ code });
+          results.success++;
+        }
+
+        return results;
+      }),
+
+    delete: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deletePromotionCode(input.id);
+        return { success: true };
+      }),
+
+    // 执行兑换码兑换
+    redeem: publicProcedure
+      .input(z.object({
+        token: z.string(),
+        clientId: z.string(),
+        promotionCode: z.string().optional(),
+        email: z.string(),
+        accountType: z.enum(['normal', 'vip']),
+      }))
+      .mutation(async ({ input }) => {
+        // 获取兑换码（如果没有指定，则随机选择一个）
+        let codeToUse = input.promotionCode;
+        if (!codeToUse) {
+          const randomCode = await db.getRandomAvailablePromotionCode();
+          if (!randomCode) {
+            throw new Error('没有可用的兑换码');
+          }
+          codeToUse = randomCode.code;
+        } else {
+          // 检查指定的兑换码是否可用
+          const existingCode = await db.getPromotionCodeByCode(codeToUse);
+          if (!existingCode) {
+            throw new Error('兑换码不存在');
+          }
+          if (existingCode.isUsed) {
+            throw new Error('兑换码已被使用');
+          }
+        }
+
+        // 调用Manus API执行兑换码
+        const result = await manusApi.redeemPromotionCode(input.token, input.clientId, codeToUse);
+        
+        if (result.success) {
+          // 标记兑换码为已使用
+          await db.markPromotionCodeUsed(codeToUse, input.email, input.accountType);
+          
+          // 刷新账号积分
+          const credits = await manusApi.getCredits(input.token, input.clientId);
+          
+          // 更新账号积分
+          if (input.accountType === 'normal') {
+            const account = await db.getAccountByEmail(input.email);
+            if (account) {
+              await db.updateAccount(account.id, {
+                totalCredits: credits.totalCredits,
+                freeCredits: credits.freeCredits,
+                lastCheckedAt: new Date(),
+              });
+            }
+          } else {
+            const vipAccount = await db.getVipAccountByEmail(input.email);
+            if (vipAccount) {
+              await db.updateVipAccount(vipAccount.id, {
+                totalCredits: credits.totalCredits,
+                freeCredits: credits.freeCredits,
+                lastCheckedAt: new Date(),
+              });
+            }
+          }
+          
+          return {
+            success: true,
+            message: '兑换成功',
+            promotionCode: codeToUse,
+            newCredits: credits.freeCredits,
+          };
+        } else {
+          return {
+            success: false,
+            message: result.error || '兑换失败',
+            promotionCode: codeToUse,
+          };
+        }
+      }),
+
+    // 批量执行兑换码（用于制作积分账号）
+    redeemBatch: publicProcedure
+      .input(z.object({
+        accountType: z.enum(['normal', 'vip']),
+        creditCategory: z.string(),
+        count: z.number().min(1).max(100),
+      }))
+      .mutation(async ({ input }) => {
+        const results = { success: 0, failed: 0, errors: [] as string[] };
+        
+        // 获取符合条件的账号
+        let accounts: any[] = [];
+        if (input.accountType === 'normal') {
+          const allAccounts = await db.getAllAccounts();
+          accounts = allAccounts.filter(a => 
+            manusApi.getCreditCategory(a.totalCredits || 0) === input.creditCategory
+          );
+        } else {
+          const allVipAccounts = await db.getAllVipAccounts();
+          accounts = allVipAccounts.filter(a => 
+            manusApi.getCreditCategory(a.totalCredits || 0) === input.creditCategory
+          );
+        }
+
+        // 限制执行数量
+        const accountsToProcess = accounts.slice(0, input.count);
+        
+        for (const account of accountsToProcess) {
+          try {
+            // 获取随机兑换码
+            const randomCode = await db.getRandomAvailablePromotionCode();
+            if (!randomCode) {
+              results.failed++;
+              results.errors.push(`${account.email}: 没有可用的兑换码`);
+              continue;
+            }
+
+            // 执行兑换
+            const result = await manusApi.redeemPromotionCode(account.token, account.clientId, randomCode.code);
+            
+            if (result.success) {
+              // 标记兑换码为已使用
+              await db.markPromotionCodeUsed(randomCode.code, account.email, input.accountType);
+              
+              // 刷新账号积分
+              const credits = await manusApi.getCredits(account.token, account.clientId);
+              
+              // 更新账号积分
+              if (input.accountType === 'normal') {
+                await db.updateAccount(account.id, {
+                  totalCredits: credits.totalCredits,
+                  freeCredits: credits.freeCredits,
+                  lastCheckedAt: new Date(),
+                });
+              } else {
+                await db.updateVipAccount(account.id, {
+                  totalCredits: credits.totalCredits,
+                  freeCredits: credits.freeCredits,
+                  lastCheckedAt: new Date(),
+                });
+              }
+              
+              results.success++;
+            } else {
+              results.failed++;
+              results.errors.push(`${account.email}: ${result.error || '兑换失败'}`);
+            }
+          } catch (error: any) {
+            results.failed++;
+            results.errors.push(`${account.email}: ${error.message}`);
+          }
+        }
+
+        return results;
       }),
   }),
 });

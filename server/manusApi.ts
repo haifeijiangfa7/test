@@ -372,3 +372,45 @@ export async function executeInvitation(
     };
   }
 }
+
+
+// 兑换码兑换响应类型
+export interface RedeemPromotionCodeResponse {
+  success: boolean;
+  error?: string;
+}
+
+// 兑换码兑换API
+export async function redeemPromotionCode(
+  token: string, 
+  clientId: string, 
+  promotionCode: string
+): Promise<RedeemPromotionCodeResponse> {
+  try {
+    const response = await axios.post(
+      `${MANUS_API_BASE}/promotion.v1.PromotionService/RedeemPromotionCodeV2`,
+      { 
+        promotionCode: promotionCode,
+        deviceId: clientId 
+      },
+      { headers: getHeaders(token, clientId) }
+    );
+    
+    // 返回{}表示成功
+    if (response.data && Object.keys(response.data).length === 0) {
+      return { success: true };
+    }
+    
+    // 如果有错误信息
+    if (response.data?.code) {
+      return { success: false, error: response.data.message || response.data.code };
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    if (error.response?.data) {
+      return { success: false, error: error.response.data.message || error.response.data.code || '兑换失败' };
+    }
+    return { success: false, error: error.message || '请求失败' };
+  }
+}

@@ -308,3 +308,20 @@ export const deletedVipAccounts = mysqlTable("deleted_vip_accounts", {
 
 export type DeletedVipAccount = typeof deletedVipAccounts.$inferSelect;
 export type InsertDeletedVipAccount = typeof deletedVipAccounts.$inferInsert;
+
+
+/**
+ * 兑换码表 - 存储可用的兑换码
+ */
+export const promotionCodes = mysqlTable("promotion_codes", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 100 }).notNull().unique(),
+  isUsed: boolean("isUsed").default(false).notNull(),
+  usedByEmail: varchar("usedByEmail", { length: 320 }),
+  usedByAccountType: mysqlEnum("usedByAccountType", ["normal", "vip"]),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PromotionCode = typeof promotionCodes.$inferSelect;
+export type InsertPromotionCode = typeof promotionCodes.$inferInsert;

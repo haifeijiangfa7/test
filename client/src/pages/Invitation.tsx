@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Send, Link, Hash, Play, Search, Key, Loader2 } from "lucide-react";
+import { Send, Link, Hash, Play, Search, Key, Loader2, Gift } from "lucide-react";
 
 export default function Invitation() {
   const [inviteCode, setInviteCode] = useState("");
@@ -20,10 +20,15 @@ export default function Invitation() {
   const [quickInviteCount, setQuickInviteCount] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [accountInfo, setAccountInfo] = useState("");
+  const [redeemAccountType, setRedeemAccountType] = useState<'normal' | 'vip'>('normal');
+  const [redeemCode, setRedeemCode] = useState("");
+  const [redeemAccountId, setRedeemAccountId] = useState<string>("");
 
   const utils = trpc.useUtils();
   const { data: eligibleInvitees, isLoading: inviteesLoading } = trpc.invitees.eligible.useQuery({ limit: 100 });
   const { data: accounts } = trpc.accounts.list.useQuery();
+  const { data: vipAccounts } = trpc.vipAccounts.list.useQuery();
+  const { data: promotionCodeStats } = trpc.promotionCodes.stats.useQuery();
   const { data: inviteeCountData } = trpc.invitees.count.useQuery();
   const { data: stats } = trpc.stats.get.useQuery(undefined, {
     refetchInterval: 5000, // 每5秒自动刷新
@@ -49,6 +54,25 @@ export default function Invitation() {
     },
     onError: (error) => {
       toast.error(`邀请失败: ${error.message}`);
+    },
+  });
+
+  // 兑换码兑换mutation
+  const redeemMutation = trpc.promotionCodes.redeem.useMutation({
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(`兑换成功！使用兑换码: ${result.promotionCode}，新积分: ${result.newCredits}`);
+        // 刷新数据
+        utils.accounts.list.invalidate();
+        utils.vipAccounts.list.invalidate();
+        utils.promotionCodes.stats.invalidate();
+        utils.stats.get.invalidate();
+      } else {
+        toast.error(`兑换失败: ${result.message}`);
+      }
+    },
+    onError: (error) => {
+      toast.error(`兑换失败: ${error.message}`);
     },
   });
 
@@ -321,6 +345,94 @@ export default function Invitation() {
               </span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 兑换码兑换 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-green-600" />
+            兑换码兑换
+          </CardTitle>
+          <CardDescription>
+            使用兑换码为账号增加积分（可用兑换码: {promotionCodeStats?.available || 0} / 总计: {promotionCodeStats?.total || 0}）
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>账号类型</Label>
+              <Select value={redeemAccountType} onValueChange={(value: 'normal' | 'vip') => {
+                setRedeemAccountType(value);
+                setRedeemAccountId("");
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择账号类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">普通账号</SelectItem>
+                  <SelectItem value="vip">会员账号</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>选择账号</Label>
+              <Select value={redeemAccountId} onValueChange={setRedeemAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择要兑换的账号" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {redeemAccountType === 'normal' ? (
+                    accounts?.map((account) => (
+                      <SelectItem key={account.id} value={account.id.toString()}>
+                        {account.email} (积分: {account.freeCredits || 0})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    vipAccounts?.map((account) => (
+                      <SelectItem key={account.id} value={account.id.toString()}>
+                        {account.email} (积分: {account.freeCredits || 0})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>兑换码（可选，留空则随机选择）</Label>
+              <Input
+                placeholder="输入兑换码或留空"
+                value={redeemCode}
+                onChange={(e) => setRedeemCode(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            onClick={() => {
+              const selectedAccount = redeemAccountType === 'normal' 
+                ? accounts?.find(a => a.id.toString() === redeemAccountId)
+                : vipAccounts?.find(a => a.id.toString() === redeemAccountId);
+              
+              if (!selectedAccount) {
+                toast.error('请选择账号');
+                return;
+              }
+              
+              redeemMutation.mutate({
+                token: selectedAccount.token,
+                clientId: selectedAccount.clientId,
+                email: selectedAccount.email,
+                accountType: redeemAccountType,
+                promotionCode: redeemCode || undefined,
+              });
+            }}
+            disabled={redeemMutation.isPending || !redeemAccountId || (promotionCodeStats?.available || 0) === 0}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Gift className="w-4 h-4 mr-2" />
+            {redeemMutation.isPending ? "兑换中..." : "执行兑换"}
+          </Button>
         </CardContent>
       </Card>
 

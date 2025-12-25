@@ -15,6 +15,7 @@ import {
   extractedVipAccounts, InsertExtractedVipAccount,
   deletedNormalAccounts, InsertDeletedNormalAccount,
   deletedVipAccounts, InsertDeletedVipAccount,
+  promotionCodes, InsertPromotionCode, PromotionCode,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -476,4 +477,71 @@ export async function getVipAccountStockByEmail(email: string) {
   if (!db) return null;
   const result = await db.select().from(vipAccountStock).where(eq(vipAccountStock.email, email)).limit(1);
   return result[0] || null;
+}
+
+
+// ============ Promotion Codes ============
+export async function getAllPromotionCodes() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(promotionCodes).orderBy(desc(promotionCodes.createdAt));
+}
+
+export async function getAvailablePromotionCodes() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(promotionCodes).where(eq(promotionCodes.isUsed, false)).orderBy(desc(promotionCodes.createdAt));
+}
+
+export async function getRandomAvailablePromotionCode() {
+  const db = await getDb();
+  if (!db) return null;
+  const available = await db.select().from(promotionCodes).where(eq(promotionCodes.isUsed, false));
+  if (available.length === 0) return null;
+  const randomIndex = Math.floor(Math.random() * available.length);
+  return available[randomIndex];
+}
+
+export async function getPromotionCodeByCode(code: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(promotionCodes).where(eq(promotionCodes.code, code)).limit(1);
+  return result[0] || null;
+}
+
+export async function createPromotionCode(data: InsertPromotionCode) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(promotionCodes).values(data);
+}
+
+export async function markPromotionCodeUsed(code: string, usedByEmail: string, usedByAccountType: 'normal' | 'vip') {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(promotionCodes).set({
+    isUsed: true,
+    usedByEmail,
+    usedByAccountType,
+    usedAt: new Date(),
+  }).where(eq(promotionCodes.code, code));
+}
+
+export async function deletePromotionCode(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(promotionCodes).where(eq(promotionCodes.id, id));
+}
+
+export async function getPromotionCodeStats() {
+  const db = await getDb();
+  if (!db) return { total: 0, available: 0, used: 0 };
+  
+  const [totalCount] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes);
+  const [availableCount] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes).where(eq(promotionCodes.isUsed, false));
+  
+  return {
+    total: totalCount?.count || 0,
+    available: availableCount?.count || 0,
+    used: (totalCount?.count || 0) - (availableCount?.count || 0),
+  };
 }
