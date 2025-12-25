@@ -1,0 +1,8 @@
+{
+  "query": "CREATE TABLE `promotion_codes` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `code` varchar(100) NOT NULL,\n  `isUsed` boolean NOT NULL DEFAULT false,\n  `usedByEmail` varchar(320),\n  `usedByAccountType` enum('normal','vip'),\n  `usedAt` timestamp,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `promotion_codes_id` PRIMARY KEY(`id`),\n  CONSTRAINT `promotion_codes_code_unique` UNIQUE(`code`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute CREATE TABLE `promotion_codes` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `code` varchar(100) NOT NULL,\n  `isUsed` boolean NOT NULL DEFAULT false,\n  `usedByEmail` varchar(320),\n  `usedByAccountType` enum('normal','vip'),\n  `usedAt` timestamp,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `promotion_codes_id` PRIMARY KEY(`id`),\n  CONSTRAINT `promotion_codes_code_unique` UNIQUE(`code`)\n);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1050 (42S01) at line 1: Table 'bwb5QLDJGEKZppJnjPFZwE.promotion_codes' already exists"
+  ]
+}
