@@ -22,6 +22,20 @@
       "when": 1766683781204,
       "tag": "0002_worthless_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1766689581314,
+      "tag": "0003_early_silvermane",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1766690521966,
+      "tag": "0004_perfect_warpath",
+      "breakpoints": true
     }
   ]
 }

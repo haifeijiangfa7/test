@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Trash2, Download, Copy, User, Crown, History, AlertCircle, Shuffle, Search } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Download, Copy, User, Crown, History, AlertCircle, Shuffle, Search, CheckSquare } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -23,6 +24,8 @@ export default function AccountStock() {
   const [vipExpiryFilter, setVipExpiryFilter] = useState("all");
   const [normalSearchQuery, setNormalSearchQuery] = useState("");
   const [vipSearchQuery, setVipSearchQuery] = useState("");
+  const [selectedNormalIds, setSelectedNormalIds] = useState<number[]>([]);
+  const [selectedVipIds, setSelectedVipIds] = useState<number[]>([]);
 
   const utils = trpc.useUtils();
 
@@ -65,6 +68,17 @@ export default function AccountStock() {
     },
   });
   const { data: accountsExport } = trpc.accounts.export.useQuery();
+  const batchDeleteAccountsMutation = trpc.batchDelete.accounts.useMutation({
+    onSuccess: (result) => {
+      toast.success(`批量删除成功: ${result.count}个账号`);
+      setSelectedNormalIds([]);
+      utils.accounts.list.invalidate();
+      utils.stats.get.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`删除失败: ${error.message}`);
+    },
+  });
 
   // 会员账号
   const { data: vipAccounts, isLoading: vipAccountsLoading } = trpc.vipAccounts.list.useQuery();
@@ -105,6 +119,17 @@ export default function AccountStock() {
     },
   });
   const { data: vipAccountsExport } = trpc.vipAccounts.export.useQuery();
+  const batchDeleteVipAccountsMutation = trpc.batchDelete.vipAccounts.useMutation({
+    onSuccess: (result) => {
+      toast.success(`批量删除成功: ${result.count}个账号`);
+      setSelectedVipIds([]);
+      utils.vipAccounts.list.invalidate();
+      utils.stats.get.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`删除失败: ${error.message}`);
+    },
+  });
 
   // 已提取和已删除记录
   const { data: extractedNormal } = trpc.stock.extracted.normal.useQuery();
@@ -443,20 +468,45 @@ export default function AccountStock() {
                     </Badge>
                   ))}
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="搜索邮箱或邀请码..."
-                    value={normalSearchQuery}
-                    onChange={(e) => setNormalSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
-                  />
+                <div className="flex items-center gap-2">
+                  {selectedNormalIds.length > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => batchDeleteAccountsMutation.mutate({ ids: selectedNormalIds })}
+                      disabled={batchDeleteAccountsMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      删除选中 ({selectedNormalIds.length})
+                    </Button>
+                  )}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="搜索邮箱或邀请码..."
+                      value={normalSearchQuery}
+                      onChange={(e) => setNormalSearchQuery(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={selectedNormalIds.length === filteredNormalAccounts.length && filteredNormalAccounts.length > 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedNormalIds(filteredNormalAccounts.map(a => a.id));
+                            } else {
+                              setSelectedNormalIds([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
                       <TableHead>邮箱</TableHead>
                       <TableHead>积分</TableHead>
                       <TableHead>积分分类</TableHead>
@@ -471,10 +521,22 @@ export default function AccountStock() {
                     {accountsLoading ? (
                       <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">加载中...</TableCell></TableRow>
                     ) : filteredNormalAccounts.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                     ) : (
                       filteredNormalAccounts.map((account) => (
                         <TableRow key={account.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedNormalIds.includes(account.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedNormalIds([...selectedNormalIds, account.id]);
+                                } else {
+                                  setSelectedNormalIds(selectedNormalIds.filter(id => id !== account.id));
+                                }
+                              }}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{account.email}</TableCell>
                           <TableCell>{account.totalCredits || "-"}</TableCell>
                           <TableCell>{getCreditCategoryBadge(account.totalCredits)}</TableCell>
@@ -607,20 +669,45 @@ export default function AccountStock() {
                     </Badge>
                   ))}
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="搜索邮箱或邀请码..."
-                    value={vipSearchQuery}
-                    onChange={(e) => setVipSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
-                  />
+                <div className="flex items-center gap-2">
+                  {selectedVipIds.length > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => batchDeleteVipAccountsMutation.mutate({ ids: selectedVipIds })}
+                      disabled={batchDeleteVipAccountsMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      删除选中 ({selectedVipIds.length})
+                    </Button>
+                  )}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="搜索邮箱或邀请码..."
+                      value={vipSearchQuery}
+                      onChange={(e) => setVipSearchQuery(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={selectedVipIds.length === filteredVipAccounts.length && filteredVipAccounts.length > 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedVipIds(filteredVipAccounts.map(a => a.id));
+                            } else {
+                              setSelectedVipIds([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
                       <TableHead>邮箱</TableHead>
                       <TableHead>积分</TableHead>
                       <TableHead>积分分类</TableHead>
@@ -634,12 +721,24 @@ export default function AccountStock() {
                   </TableHeader>
                   <TableBody>
                     {vipAccountsLoading ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-500">加载中...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={10} className="text-center py-8 text-gray-500">加载中...</TableCell></TableRow>
                     ) : filteredVipAccounts.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={10} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                     ) : (
                       filteredVipAccounts.map((account) => (
                         <TableRow key={account.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedVipIds.includes(account.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedVipIds([...selectedVipIds, account.id]);
+                                } else {
+                                  setSelectedVipIds(selectedVipIds.filter(id => id !== account.id));
+                                }
+                              }}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{account.email}</TableCell>
                           <TableCell>{account.totalCredits || "-"}</TableCell>
                           <TableCell>{getCreditCategoryBadge(account.totalCredits)}</TableCell>

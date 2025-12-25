@@ -30,7 +30,8 @@ import {
   Target, 
   History, 
   Package,
-  FileText
+  FileText,
+  Gift
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -42,6 +43,7 @@ const menuItems = [
   { icon: Users, label: "被邀请账号", path: "/invitees" },
   { icon: Send, label: "执行邀请", path: "/invitation" },
   { icon: Target, label: "制作积分账号", path: "/credit-tasks" },
+  { icon: Gift, label: "兑换码管理", path: "/promotion-codes" },
   { icon: History, label: "邀请记录", path: "/logs" },
   { icon: FileText, label: "制作记录", path: "/account-logs" },
   { icon: Package, label: "账号库存", path: "/account-stock" },

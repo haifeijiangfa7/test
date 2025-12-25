@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Play, Trash2, Link, User, Crown, Hash, AlertTriangle, Search } from "lucide-react";
+import { Play, Trash2, Link, User, Crown, Hash, AlertTriangle, Search, Gift } from "lucide-react";
 
 // 积分分类：从1500开始，每次+500
 const CREDIT_CATEGORIES = [1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000];
@@ -46,6 +46,11 @@ export default function CreditTasks() {
   const [vipTargetCredits, setVipTargetCredits] = useState("2000"); // 目标积分
   const [vipMakeCount, setVipMakeCount] = useState("1");
 
+  // 兑换码模式
+  const [redeemTargetCredits, setRedeemTargetCredits] = useState("1500"); // 目标积分分类
+  const [redeemAccountType, setRedeemAccountType] = useState<"normal" | "vip">("normal"); // 账号类型
+  const [redeemMakeCount, setRedeemMakeCount] = useState("1");
+
   // 警告弹窗
   const [showWarning, setShowWarning] = useState(false);
   const [warningMessage, setWarningMessage] = useState("");
@@ -55,6 +60,9 @@ export default function CreditTasks() {
   const { data: accounts } = trpc.accounts.list.useQuery();
   const { data: vipAccounts } = trpc.vipAccounts.list.useQuery();
   const { data: inviteeCount } = trpc.invitees.count.useQuery();
+  const { data: promotionCodeStats } = trpc.promotionCodes.stats.useQuery();
+  const { data: normalStock } = trpc.stock.normal.list.useQuery();
+  const { data: vipStock } = trpc.stock.vip.list.useQuery();
 
   // 按积分分类统计普通账号
   const normalAccountsByCategory = useMemo(() => {
@@ -333,6 +341,105 @@ export default function CreditTasks() {
     ? calculateRequiredInvites(parseInt(vipTargetCredits), parseInt(vipSourceCategory)) * (parseInt(vipMakeCount) || 1)
     : 0;
 
+  // 兑换码模式：按积分分类统计库存账号
+  const normalStockByCategory = useMemo(() => {
+    const categories: Record<number, NonNullable<typeof normalStock>> = {};
+    normalStock?.forEach(account => {
+      const category = getCreditCategory(account.credits || 0);
+      if (category > 0) {
+        if (!categories[category]) categories[category] = [];
+        categories[category]!.push(account);
+      }
+    });
+    return categories;
+  }, [normalStock]);
+
+  const vipStockByCategory = useMemo(() => {
+    const categories: Record<number, NonNullable<typeof vipStock>> = {};
+    vipStock?.forEach(account => {
+      const category = getCreditCategory(account.credits || 0);
+      if (category > 0) {
+        if (!categories[category]) categories[category] = [];
+        categories[category]!.push(account);
+      }
+    });
+    return categories;
+  }, [vipStock]);
+
+  // 兑换码模式：可选的积分分类
+  const redeemAvailableCategories = useMemo(() => {
+    const stockByCategory = redeemAccountType === "normal" ? normalStockByCategory : vipStockByCategory;
+    return CREDIT_CATEGORIES.filter(cat => stockByCategory[cat]?.length > 0);
+  }, [redeemAccountType, normalStockByCategory, vipStockByCategory]);
+
+  // 兑换码模式：可用账号数量
+  const redeemAvailableAccounts = useMemo(() => {
+    const stockByCategory = redeemAccountType === "normal" ? normalStockByCategory : vipStockByCategory;
+    const category = parseInt(redeemTargetCredits);
+    return stockByCategory[category] || [];
+  }, [redeemAccountType, redeemTargetCredits, normalStockByCategory, vipStockByCategory]);
+
+  // 兑换码执行 mutation
+  const redeemMutation = trpc.promotionCodes.redeem.useMutation({
+    onSuccess: (result) => {
+      toast.success(`兑换成功: ${result.email} 积分 ${result.creditsBefore} → ${result.creditsAfter}`);
+      utils.promotionCodes.stats.invalidate();
+      utils.promotionCodes.list.invalidate();
+      utils.stock.normal.list.invalidate();
+      utils.stock.vip.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`兑换失败: ${error.message}`);
+    },
+  });
+
+  // 执行兑换码模式
+  const handleRedeemMode = async () => {
+    const makeCount = parseInt(redeemMakeCount) || 1;
+    const stockByCategory = redeemAccountType === "normal" ? normalStockByCategory : vipStockByCategory;
+    const category = parseInt(redeemTargetCredits);
+    const availableAccounts = stockByCategory[category] || [];
+
+    if (availableAccounts.length === 0) {
+      toast.error("所选分类没有可用账号");
+      return;
+    }
+
+    if (availableAccounts.length < makeCount) {
+      setWarningMessage(`所选分类账号不足！需要 ${makeCount} 个，当前只有 ${availableAccounts.length} 个`);
+      setShowWarning(true);
+      return;
+    }
+
+    if ((promotionCodeStats?.available || 0) < makeCount) {
+      setWarningMessage(`兑换码不足！需要 ${makeCount} 个，当前只有 ${promotionCodeStats?.available || 0} 个`);
+      setShowWarning(true);
+      return;
+    }
+
+    // 随机选择账号
+    const shuffled = [...availableAccounts].sort(() => Math.random() - 0.5);
+    const selectedAccounts = shuffled.slice(0, makeCount);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const account of selectedAccounts) {
+      try {
+        // 构建账号信息字符串
+        const accountInfo = `${account.email}----${account.password}----${account.token}`;
+        await redeemMutation.mutateAsync({ accountInfo });
+        successCount++;
+      } catch (error) {
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`兑换完成: 成功 ${successCount} 个, 失败 ${failCount} 个`);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -407,7 +514,7 @@ export default function CreditTasks() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="invite_only" className="flex items-center gap-2">
             <Link className="w-4 h-4" />
             邀请链接模式
@@ -419,6 +526,10 @@ export default function CreditTasks() {
           <TabsTrigger value="vip_account" className="flex items-center gap-2">
             <Crown className="w-4 h-4" />
             会员账号模式
+          </TabsTrigger>
+          <TabsTrigger value="redeem_code" className="flex items-center gap-2">
+            <Gift className="w-4 h-4" />
+            兑换码模式
           </TabsTrigger>
         </TabsList>
 
@@ -658,6 +769,112 @@ export default function CreditTasks() {
               >
                 <Play className="w-4 h-4 mr-2" />
                 {createMutation.isPending ? "创建中..." : `开始制作 (${vipMakeCount}个)`}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="redeem_code">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-purple-500" />
+                兑换码模式
+              </CardTitle>
+              <CardDescription>
+                使用兑换码为库存中的账号增加积分。
+                选择积分分类和账号类型，系统将从库存中随机选择账号执行兑换码操作。
+                每个账号只执行一次兑换码操作。
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>账号类型</Label>
+                  <Select value={redeemAccountType} onValueChange={(val: "normal" | "vip") => {
+                    setRedeemAccountType(val);
+                    setRedeemTargetCredits("1500"); // 重置积分分类
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">
+                        <span className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          普通账号
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="vip">
+                        <span className="flex items-center gap-2">
+                          <Crown className="w-4 h-4 text-amber-500" />
+                          会员账号
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>积分分类</Label>
+                  <Select value={redeemTargetCredits} onValueChange={setRedeemTargetCredits}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择积分分类" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CREDIT_CATEGORIES.map((cat) => {
+                        const stockByCategory = redeemAccountType === "normal" ? normalStockByCategory : vipStockByCategory;
+                        const count = stockByCategory[cat]?.length || 0;
+                        return (
+                          <SelectItem key={cat} value={cat.toString()} disabled={count === 0}>
+                            {cat}积分 ({count}个账号)
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>执行个数</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      type="number"
+                      min="1"
+                      max={Math.min(redeemAvailableAccounts.length, promotionCodeStats?.available || 0)}
+                      value={redeemMakeCount}
+                      onChange={(e) => setRedeemMakeCount(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>可用兑换码</Label>
+                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
+                    <Gift className="w-4 h-4 mr-2 text-purple-500" />
+                    <span className="font-medium">{promotionCodeStats?.available || 0}</span>
+                    <span className="text-muted-foreground ml-1">个</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-sm text-gray-500 space-y-1">
+                <p>
+                  可用{redeemAccountType === "normal" ? "普通" : "会员"}账号: {redeemAvailableAccounts.length} 个 | 
+                  可用兑换码: {promotionCodeStats?.available || 0} 个
+                  {redeemAvailableAccounts.length < parseInt(redeemMakeCount) && (
+                    <span className="text-red-500 ml-2">（账号不足！）</span>
+                  )}
+                  {(promotionCodeStats?.available || 0) < parseInt(redeemMakeCount) && (
+                    <span className="text-red-500 ml-2">（兑换码不足！）</span>
+                  )}
+                </p>
+              </div>
+              <Button 
+                onClick={handleRedeemMode}
+                disabled={redeemMutation.isPending || redeemAvailableAccounts.length === 0 || (promotionCodeStats?.available || 0) === 0}
+                className="w-full bg-purple-600 hover:bg-purple-700"
+              >
+                <Gift className="w-4 h-4 mr-2" />
+                {redeemMutation.isPending ? "执行中..." : `执行兑换 (${redeemMakeCount}个)`}
               </Button>
             </CardContent>
           </Card>

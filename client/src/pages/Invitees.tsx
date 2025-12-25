@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Plus, RefreshCw, Trash2, Download, Copy, CheckCircle, XCircle, AlertCircle, Clock, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -18,6 +19,7 @@ export default function Invitees() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState<number | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -108,6 +110,18 @@ export default function Invitees() {
   });
 
   const { data: exportData } = trpc.invitees.export.useQuery();
+
+  const batchDeleteMutation = trpc.batchDelete.invitees.useMutation({
+    onSuccess: (result) => {
+      toast.success(`批量删除成功: ${result.count}个账号`);
+      setSelectedIds([]);
+      utils.invitees.list.invalidate();
+      utils.stats.get.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`删除失败: ${error.message}`);
+    },
+  });
 
   const handleExport = () => {
     if (exportData) {
@@ -241,6 +255,17 @@ export default function Invitees() {
               <CardDescription>共 {filteredInvitees?.length || 0} 个账号</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => batchDeleteMutation.mutate({ ids: selectedIds })}
+                  disabled={batchDeleteMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  删除选中 ({selectedIds.length})
+                </Button>
+              )}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
@@ -269,6 +294,18 @@ export default function Invitees() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={selectedIds.length === (filteredInvitees?.length || 0) && (filteredInvitees?.length || 0) > 0}
+                      onCheckedChange={(checked) => {
+                        if (checked && filteredInvitees) {
+                          setSelectedIds(filteredInvitees.map(i => i.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>邮箱</TableHead>
                   <TableHead>免费积分</TableHead>
                   <TableHead>状态</TableHead>
@@ -280,19 +317,31 @@ export default function Invitees() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : filteredInvitees?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                       暂无数据
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredInvitees?.map((invitee) => (
                     <TableRow key={invitee.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.includes(invitee.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedIds([...selectedIds, invitee.id]);
+                            } else {
+                              setSelectedIds(selectedIds.filter(id => id !== invitee.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{invitee.email}</TableCell>
                       <TableCell>{invitee.freeCredits ?? "-"}</TableCell>
                       <TableCell>{getStatusBadge(invitee)}</TableCell>

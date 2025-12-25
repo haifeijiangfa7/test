@@ -372,3 +372,88 @@ export async function executeInvitation(
     };
   }
 }
+
+
+// 兑换码响应类型
+export interface RedeemCodeResponse {
+  success: boolean;
+  error?: string;
+}
+
+// 执行兑换码
+export async function redeemPromotionCode(
+  token: string, 
+  clientId: string, 
+  promotionCode: string
+): Promise<RedeemCodeResponse> {
+  try {
+    const response = await axios.post(
+      `${MANUS_API_BASE}/promotion.v1.PromotionService/RedeemPromotionCodeV2`,
+      { 
+        promotionCode: promotionCode,
+        deviceId: generateClientId(22)
+      },
+      { headers: getHeaders(token, clientId) }
+    );
+    
+    // 返回{}表示成功
+    if (response.data && Object.keys(response.data).length === 0) {
+      return { success: true };
+    }
+    
+    // 如果有错误信息
+    if (response.data?.code) {
+      return { success: false, error: response.data.message || response.data.code };
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    if (error.response?.data) {
+      return { success: false, error: error.response.data.message || error.response.data.code || 'Unknown error' };
+    }
+    return { success: false, error: error.message || 'Request failed' };
+  }
+}
+
+// 执行完整兑换码流程（包含积分刷新）
+export async function executeRedeemCode(
+  token: string,
+  clientId: string,
+  promotionCode: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  creditsBefore?: number;
+  creditsAfter?: number;
+}> {
+  // 1. 获取当前积分
+  const creditsBefore = await getCredits(token, clientId);
+  if (isBlocked(creditsBefore)) {
+    return { success: false, error: '账号已被封禁' };
+  }
+  
+  const beforeCredits = creditsBefore.freeCredits || 0;
+  
+  // 2. 执行兑换码
+  const redeemResult = await redeemPromotionCode(token, clientId, promotionCode);
+  if (!redeemResult.success) {
+    return { success: false, error: redeemResult.error, creditsBefore: beforeCredits };
+  }
+  
+  // 3. 等待一小段时间后获取新积分
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // 4. 获取新积分
+  const creditsAfter = await getCredits(token, clientId);
+  if (isBlocked(creditsAfter)) {
+    return { success: false, error: '兑换后账号被封禁', creditsBefore: beforeCredits };
+  }
+  
+  const afterCredits = creditsAfter.freeCredits || 0;
+  
+  return { 
+    success: true, 
+    creditsBefore: beforeCredits, 
+    creditsAfter: afterCredits 
+  };
+}

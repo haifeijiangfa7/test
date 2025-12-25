@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS promotion_codes (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  code VARCHAR(100) NOT NULL UNIQUE,\n  status ENUM('available', 'used', 'invalid') DEFAULT 'available' NOT NULL,\n  usedByAccountId INT,\n  usedByAccountType ENUM('normal', 'vip'),\n  usedByEmail VARCHAR(320),\n  usedAt TIMESTAMP NULL,\n  creditsBefore INT,\n  creditsAfter INT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 49rQA9eTW5K3aEQ.root --database bwb5QLDJGEKZppJnjPFZwE --execute CREATE TABLE IF NOT EXISTS promotion_codes (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  code VARCHAR(100) NOT NULL UNIQUE,\n  status ENUM('available', 'used', 'invalid') DEFAULT 'available' NOT NULL,\n  usedByAccountId INT,\n  usedByAccountType ENUM('normal', 'vip'),\n  usedByEmail VARCHAR(320),\n  usedAt TIMESTAMP NULL,\n  creditsBefore INT,\n  creditsAfter INT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 209
+}

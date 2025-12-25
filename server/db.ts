@@ -477,3 +477,147 @@ export async function getVipAccountStockByEmail(email: string) {
   const result = await db.select().from(vipAccountStock).where(eq(vipAccountStock.email, email)).limit(1);
   return result[0] || null;
 }
+
+
+// ============ Promotion Codes (兑换码) ============
+import { promotionCodes, InsertPromotionCode, PromotionCode } from "../drizzle/schema";
+
+export type { InsertPromotionCode, PromotionCode };
+
+export async function getAllPromotionCodes() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(promotionCodes).orderBy(desc(promotionCodes.createdAt));
+}
+
+export async function getAvailablePromotionCodes() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(promotionCodes)
+    .where(eq(promotionCodes.status, 'available'))
+    .orderBy(desc(promotionCodes.createdAt));
+}
+
+export async function getPromotionCodeById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(promotionCodes).where(eq(promotionCodes.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function getPromotionCodeByCode(code: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(promotionCodes).where(eq(promotionCodes.code, code)).limit(1);
+  return result[0] || null;
+}
+
+export async function createPromotionCode(data: InsertPromotionCode) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(promotionCodes).values(data);
+}
+
+export async function updatePromotionCode(id: number, data: Partial<InsertPromotionCode>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(promotionCodes).set(data).where(eq(promotionCodes.id, id));
+}
+
+export async function deletePromotionCode(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(promotionCodes).where(eq(promotionCodes.id, id));
+}
+
+export async function getPromotionCodeStats() {
+  const db = await getDb();
+  if (!db) return { total: 0, available: 0, used: 0, invalid: 0 };
+  
+  const [total] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes);
+  const [available] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes).where(eq(promotionCodes.status, 'available'));
+  const [used] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes).where(eq(promotionCodes.status, 'used'));
+  const [invalid] = await db.select({ count: sql<number>`count(*)` }).from(promotionCodes).where(eq(promotionCodes.status, 'invalid'));
+  
+  return {
+    total: total?.count || 0,
+    available: available?.count || 0,
+    used: used?.count || 0,
+    invalid: invalid?.count || 0,
+  };
+}
+
+// ============ Batch Delete Functions ============
+export async function deleteAccountsByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return 0;
+  const result = await db.delete(accounts).where(sql`${accounts.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+  return result[0]?.affectedRows || 0;
+}
+
+export async function deleteVipAccountsByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return 0;
+  const result = await db.delete(vipAccounts).where(sql`${vipAccounts.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+  return result[0]?.affectedRows || 0;
+}
+
+export async function deleteInviteesByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return 0;
+  const result = await db.delete(invitees).where(sql`${invitees.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+  return result[0]?.affectedRows || 0;
+}
+
+export async function deleteNormalAccountStockByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return 0;
+  const result = await db.delete(normalAccountStock).where(sql`${normalAccountStock.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+  return result[0]?.affectedRows || 0;
+}
+
+export async function deleteVipAccountStockByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return 0;
+  const result = await db.delete(vipAccountStock).where(sql`${vipAccountStock.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+  return result[0]?.affectedRows || 0;
+}
+
+export async function deletePromotionCodesByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return 0;
+  const result = await db.delete(promotionCodes).where(sql`${promotionCodes.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+  return result[0]?.affectedRows || 0;
+}
+
+// ============ Check Email Exists (去重检查) ============
+export async function checkEmailExistsInAnyTable(email: string): Promise<{
+  existsInAccounts: boolean;
+  existsInVipAccounts: boolean;
+  existsInInvitees: boolean;
+}> {
+  const db = await getDb();
+  if (!db) return { existsInAccounts: false, existsInVipAccounts: false, existsInInvitees: false };
+  
+  const [accountResult] = await db.select({ count: sql<number>`count(*)` }).from(accounts).where(eq(accounts.email, email));
+  const [vipResult] = await db.select({ count: sql<number>`count(*)` }).from(vipAccounts).where(eq(vipAccounts.email, email));
+  const [inviteeResult] = await db.select({ count: sql<number>`count(*)` }).from(invitees).where(eq(invitees.email, email));
+  
+  return {
+    existsInAccounts: (accountResult?.count || 0) > 0,
+    existsInVipAccounts: (vipResult?.count || 0) > 0,
+    existsInInvitees: (inviteeResult?.count || 0) > 0,
+  };
+}
+
+
+// ============ Get Random Available Promotion Code ============
+export async function getRandomAvailablePromotionCode() {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(promotionCodes)
+    .where(eq(promotionCodes.status, 'available'))
+    .orderBy(sql`RAND()`)
+    .limit(1);
+  return result[0] || null;
+}

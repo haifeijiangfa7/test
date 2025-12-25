@@ -43,6 +43,8 @@ export const accounts = mysqlTable("accounts", {
   inviteUsedCount: int("inviteUsedCount").default(0),
   isBlocked: boolean("isBlocked").default(false),
   smsVerified: boolean("smsVerified").default(false),
+  hasRedeemedCode: boolean("hasRedeemedCode").default(false),
+  lastRedeemedAt: timestamp("lastRedeemedAt"),
   registeredAt: timestamp("registeredAt"),
   lastCheckedAt: timestamp("lastCheckedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -77,6 +79,8 @@ export const vipAccounts = mysqlTable("vip_accounts", {
   inviteUsedCount: int("inviteUsedCount").default(0),
   isBlocked: boolean("isBlocked").default(false),
   smsVerified: boolean("smsVerified").default(false),
+  hasRedeemedCode: boolean("hasRedeemedCode").default(false),
+  lastRedeemedAt: timestamp("lastRedeemedAt"),
   registeredAt: timestamp("registeredAt"),
   lastCheckedAt: timestamp("lastCheckedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -308,3 +312,24 @@ export const deletedVipAccounts = mysqlTable("deleted_vip_accounts", {
 
 export type DeletedVipAccount = typeof deletedVipAccounts.$inferSelect;
 export type InsertDeletedVipAccount = typeof deletedVipAccounts.$inferInsert;
+
+
+/**
+ * 兑换码表 - 存储可用的兑换码
+ */
+export const promotionCodes = mysqlTable("promotion_codes", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 100 }).notNull().unique(),
+  status: mysqlEnum("status", ["available", "used", "invalid"]).default("available").notNull(),
+  usedByAccountId: int("usedByAccountId"),
+  usedByAccountType: mysqlEnum("usedByAccountType", ["normal", "vip"]),
+  usedByEmail: varchar("usedByEmail", { length: 320 }),
+  usedAt: timestamp("usedAt"),
+  creditsBefore: int("creditsBefore"),
+  creditsAfter: int("creditsAfter"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PromotionCode = typeof promotionCodes.$inferSelect;
+export type InsertPromotionCode = typeof promotionCodes.$inferInsert;
