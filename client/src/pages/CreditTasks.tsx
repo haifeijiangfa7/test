@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Play, Trash2, Link, User, Crown, Hash, AlertTriangle } from "lucide-react";
+import { Play, Trash2, Link, User, Crown, Hash, AlertTriangle, Search } from "lucide-react";
 
 // 积分分类：从1500开始，每次+500
 const CREDIT_CATEGORIES = [1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000];
@@ -29,6 +29,8 @@ const getCreditCategory = (credits: number): number => {
 
 export default function CreditTasks() {
   const [activeTab, setActiveTab] = useState("invite_only");
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState("all");
   
   // 邀请链接模式
   const [inviteUrl, setInviteUrl] = useState("");
@@ -665,8 +667,35 @@ export default function CreditTasks() {
       {/* 任务列表 */}
       <Card>
         <CardHeader>
-          <CardTitle>任务列表</CardTitle>
-          <CardDescription>查看所有制作任务的状态和进度</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>任务列表</CardTitle>
+              <CardDescription>查看所有制作任务的状态和进度</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="搜索邮箱或邀请码..."
+                  value={taskSearchQuery}
+                  onChange={(e) => setTaskSearchQuery(e.target.value)}
+                  className="pl-10 w-56"
+                />
+              </div>
+              <Select value={taskStatusFilter} onValueChange={setTaskStatusFilter}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="筛选状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
+                  <SelectItem value="pending">待执行</SelectItem>
+                  <SelectItem value="running">执行中</SelectItem>
+                  <SelectItem value="completed">已完成</SelectItem>
+                  <SelectItem value="failed">失败</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -689,14 +718,28 @@ export default function CreditTasks() {
                     加载中...
                   </TableCell>
                 </TableRow>
-              ) : tasks?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                    暂无任务
-                  </TableCell>
-                </TableRow>
-              ) : (
-                tasks?.map((task) => (
+              ) : (() => {
+                const filteredTasks = tasks?.filter((task) => {
+                  // 状态筛选
+                  if (taskStatusFilter !== "all" && task.status !== taskStatusFilter) return false;
+                  // 搜索筛选
+                  if (taskSearchQuery.trim()) {
+                    const query = taskSearchQuery.toLowerCase();
+                    const matchEmail = task.targetEmail?.toLowerCase().includes(query);
+                    const matchCode = task.targetInviteCode?.toLowerCase().includes(query);
+                    const matchInvitees = task.inviteeEmails?.toLowerCase().includes(query);
+                    if (!matchEmail && !matchCode && !matchInvitees) return false;
+                  }
+                  return true;
+                });
+                return filteredTasks?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      暂无任务
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTasks?.map((task) => (
                   <TableRow key={task.id}>
                     <TableCell>{getModeLabel(task.mode)}</TableCell>
                     <TableCell className="max-w-[150px] truncate" title={task.targetEmail || task.targetInviteCode}>
@@ -756,7 +799,8 @@ export default function CreditTasks() {
                     </TableCell>
                   </TableRow>
                 ))
-              )}
+                );
+              })()}
             </TableBody>
           </Table>
         </CardContent>

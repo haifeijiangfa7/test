@@ -9,13 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Trash2, Download, Copy, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Download, Copy, CheckCircle, XCircle, AlertCircle, Clock, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Invitees() {
   const [importData, setImportData] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState<number | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -120,10 +122,17 @@ export default function Invitees() {
   };
 
   const filteredInvitees = invitees?.filter((invitee) => {
-    if (statusFilter === "all") return true;
-    if (statusFilter === "pending") return invitee.inviteStatus === "pending";
-    if (statusFilter === "sms_unverified") return !invitee.smsVerified;
-    if (statusFilter === "ineligible") return invitee.inviteStatus === "ineligible";
+    // 状态筛选
+    if (statusFilter === "pending" && invitee.inviteStatus !== "pending") return false;
+    if (statusFilter === "sms_unverified" && invitee.smsVerified) return false;
+    if (statusFilter === "ineligible" && invitee.inviteStatus !== "ineligible") return false;
+    
+    // 搜索筛选
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      if (!invitee.email.toLowerCase().includes(query)) return false;
+    }
+    
     return true;
   });
 
@@ -231,17 +240,28 @@ export default function Invitees() {
               <CardTitle>账号列表</CardTitle>
               <CardDescription>共 {filteredInvitees?.length || 0} 个账号</CardDescription>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="筛选状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部</SelectItem>
-                <SelectItem value="pending">符合条件</SelectItem>
-                <SelectItem value="sms_unverified">短信未验证</SelectItem>
-                <SelectItem value="ineligible">不符合条件</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="搜索邮箱..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-48"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="筛选状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
+                  <SelectItem value="pending">符合条件</SelectItem>
+                  <SelectItem value="sms_unverified">短信未验证</SelectItem>
+                  <SelectItem value="ineligible">不符合条件</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

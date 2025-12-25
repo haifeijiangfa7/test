@@ -1,11 +1,37 @@
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Search } from "lucide-react";
 
 export default function InvitationLogs() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  
   const { data: logs, isLoading } = trpc.invitationLogs.list.useQuery();
+
+  const filteredLogs = useMemo(() => {
+    if (!logs) return [];
+    return logs.filter((log) => {
+      // 状态筛选
+      if (statusFilter === "success" && log.status !== "success") return false;
+      if (statusFilter === "failed" && log.status !== "failed") return false;
+      
+      // 搜索筛选
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchInviter = log.inviterEmail?.toLowerCase().includes(query);
+        const matchInvitee = log.inviteeEmail?.toLowerCase().includes(query);
+        const matchCode = log.inviteCode?.toLowerCase().includes(query);
+        if (!matchInviter && !matchInvitee && !matchCode) return false;
+      }
+      
+      return true;
+    });
+  }, [logs, searchQuery, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -16,8 +42,33 @@ export default function InvitationLogs() {
 
       <Card>
         <CardHeader>
-          <CardTitle>记录列表</CardTitle>
-          <CardDescription>共 {logs?.length || 0} 条记录</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>记录列表</CardTitle>
+              <CardDescription>共 {filteredLogs.length} 条记录</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="搜索邮箱或邀请码..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-56"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="筛选状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
+                  <SelectItem value="success">成功</SelectItem>
+                  <SelectItem value="failed">失败</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -41,14 +92,14 @@ export default function InvitationLogs() {
                       加载中...
                     </TableCell>
                   </TableRow>
-                ) : logs?.length === 0 ? (
+                ) : filteredLogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       暂无记录
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logs?.map((log) => (
+                  filteredLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="font-medium max-w-[150px] truncate">
                         {log.inviterEmail || "-"}

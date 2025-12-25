@@ -1220,6 +1220,50 @@ export const appRouter = router({
       }),
     }),
   }),
+
+  // ============ 工具API ============
+  utils: router({
+    // 根据账号信息获取邀请码
+    getInviteCode: publicProcedure
+      .input(z.object({ accountInfo: z.string() }))
+      .mutation(async ({ input }) => {
+        // 解析账号信息: 邮箱----密码----token
+        const parts = input.accountInfo.trim().split('----');
+        if (parts.length !== 3) {
+          throw new Error('格式错误，请使用: 邮箱----密码----token');
+        }
+
+        const [email, password, token] = parts.map(p => p.trim());
+        
+        // 解析token
+        const tokenInfo = manusApi.parseToken(token);
+        if (!tokenInfo) {
+          throw new Error('Token解析失败');
+        }
+
+        // 生成clientId
+        const clientId = manusApi.generateClientId();
+
+        try {
+          // 获取邀请码
+          const inviteCodes = await manusApi.getInvitationCodes(token, clientId);
+          const inviteCode = inviteCodes.invitationCodes?.[0]?.inviteCode;
+
+          if (!inviteCode) {
+            throw new Error('未找到邀请码');
+          }
+
+          return {
+            success: true,
+            email,
+            inviteCode,
+            inviteLink: `https://manus.im/invitation/${inviteCode}`,
+          };
+        } catch (error: any) {
+          throw new Error(`获取邀请码失败: ${error.message}`);
+        }
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

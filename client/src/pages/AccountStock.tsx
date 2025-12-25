@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Trash2, Download, Copy, User, Crown, History, AlertCircle, Shuffle } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Download, Copy, User, Crown, History, AlertCircle, Shuffle, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function AccountStock() {
@@ -19,6 +20,9 @@ export default function AccountStock() {
   const [importType, setImportType] = useState<"normal" | "vip">("normal");
   const [normalCreditFilter, setNormalCreditFilter] = useState("all");
   const [vipCreditFilter, setVipCreditFilter] = useState("all");
+  const [vipExpiryFilter, setVipExpiryFilter] = useState("all");
+  const [normalSearchQuery, setNormalSearchQuery] = useState("");
+  const [vipSearchQuery, setVipSearchQuery] = useState("");
 
   const utils = trpc.useUtils();
 
@@ -146,6 +150,36 @@ export default function AccountStock() {
     toast.success("已复制账号信息");
   };
 
+  // 计算会员到期剩余天数
+  const getMembershipDaysLeft = (endTime: Date | string | null | undefined): number | null => {
+    if (!endTime) return null;
+    const end = new Date(endTime);
+    const now = new Date();
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // 获取会员到期分类
+  const getExpiryCategory = (endTime: Date | string | null | undefined): string => {
+    const daysLeft = getMembershipDaysLeft(endTime);
+    if (daysLeft === null) return "未知";
+    if (daysLeft <= 0) return "已过期";
+    if (daysLeft <= 7) return "7天内";
+    if (daysLeft <= 30) return "30天内";
+    return "30天以上";
+  };
+
+  // 获取会员状态标签
+  const getMembershipStatusBadge = (endTime: Date | string | null | undefined) => {
+    const daysLeft = getMembershipDaysLeft(endTime);
+    if (daysLeft === null) return <Badge variant="outline">未知</Badge>;
+    if (daysLeft <= 0) return <Badge variant="destructive">已过期</Badge>;
+    if (daysLeft <= 7) return <Badge className="bg-red-500">即将到期</Badge>;
+    if (daysLeft <= 30) return <Badge className="bg-yellow-500">即将到期</Badge>;
+    return <Badge className="bg-green-500">有效</Badge>;
+  };
+
   // 根据实际积分获取分类（从1500开始，每次+500）
   const getCreditCategory = (credits: number | null | undefined): string => {
     if (!credits) return "未知";
@@ -215,16 +249,67 @@ export default function AccountStock() {
   // 根据筛选条件过滤普通账号
   const filteredNormalAccounts = useMemo(() => {
     if (!accounts) return [];
-    if (normalCreditFilter === "all") return accounts;
-    return accounts.filter(account => getCreditCategory(account.totalCredits) === normalCreditFilter);
-  }, [accounts, normalCreditFilter]);
+    let filtered = accounts;
+    // 按积分分类筛选
+    if (normalCreditFilter !== "all") {
+      filtered = filtered.filter(account => getCreditCategory(account.totalCredits) === normalCreditFilter);
+    }
+    // 按搜索关键词筛选
+    if (normalSearchQuery.trim()) {
+      const query = normalSearchQuery.toLowerCase();
+      filtered = filtered.filter(account => 
+        account.email.toLowerCase().includes(query) ||
+        account.inviteCode?.toLowerCase().includes(query)
+      );
+    }
+    return filtered;
+  }, [accounts, normalCreditFilter, normalSearchQuery]);
 
   // 根据筛选条件过滤会员账号
   const filteredVipAccounts = useMemo(() => {
     if (!vipAccounts) return [];
-    if (vipCreditFilter === "all") return vipAccounts;
-    return vipAccounts.filter(account => getCreditCategory(account.totalCredits) === vipCreditFilter);
-  }, [vipAccounts, vipCreditFilter]);
+    let filtered = vipAccounts;
+    // 按积分分类筛选
+    if (vipCreditFilter !== "all") {
+      filtered = filtered.filter(account => getCreditCategory(account.totalCredits) === vipCreditFilter);
+    }
+    // 按到期时间筛选
+    if (vipExpiryFilter !== "all") {
+      filtered = filtered.filter(account => getExpiryCategory(account.membershipEndTime) === vipExpiryFilter);
+    }
+    // 按搜索关键词筛选
+    if (vipSearchQuery.trim()) {
+      const query = vipSearchQuery.toLowerCase();
+      filtered = filtered.filter(account => 
+        account.email.toLowerCase().includes(query) ||
+        account.inviteCode?.toLowerCase().includes(query)
+      );
+    }
+    return filtered;
+  }, [vipAccounts, vipCreditFilter, vipExpiryFilter, vipSearchQuery]);
+
+  // 获取会员账号的所有到期分类
+  const vipExpiryCategories = useMemo(() => {
+    if (!vipAccounts) return [];
+    const categories = new Set<string>();
+    vipAccounts.forEach(account => {
+      const category = getExpiryCategory(account.membershipEndTime);
+      categories.add(category);
+    });
+    const order = ["已过期", "7天内", "30天内", "30天以上", "未知"];
+    return Array.from(categories).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }, [vipAccounts]);
+
+  // 统计各到期分类的账号数量
+  const vipExpiryCategoryStats = useMemo(() => {
+    if (!vipAccounts) return {};
+    const stats: Record<string, number> = {};
+    vipAccounts.forEach(account => {
+      const category = getExpiryCategory(account.membershipEndTime);
+      stats[category] = (stats[category] || 0) + 1;
+    });
+    return stats;
+  }, [vipAccounts]);
 
   // 统计各分类的账号数量
   const normalCategoryStats = useMemo(() => {
@@ -344,18 +429,29 @@ export default function AccountStock() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* 积分分类统计 */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {normalCreditCategories.map(category => (
-                  <Badge 
-                    key={category} 
-                    variant={normalCreditFilter === category ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => setNormalCreditFilter(normalCreditFilter === category ? "all" : category)}
-                  >
-                    {category}积分: {normalCategoryStats[category] || 0}
-                  </Badge>
-                ))}
+              {/* 搜索和筛选 */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-wrap gap-2">
+                  {normalCreditCategories.map(category => (
+                    <Badge 
+                      key={category} 
+                      variant={normalCreditFilter === category ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => setNormalCreditFilter(normalCreditFilter === category ? "all" : category)}
+                    >
+                      {category}积分: {normalCategoryStats[category] || 0}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="搜索邮箱或邀请码..."
+                    value={normalSearchQuery}
+                    onChange={(e) => setNormalSearchQuery(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
               </div>
               <div className="rounded-md border">
                 <Table>
@@ -390,9 +486,6 @@ export default function AccountStock() {
                             ) : (
                               <Badge className="bg-green-500">正常</Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500">
-                            {account.lastCheckedAt ? new Date(account.lastCheckedAt).toLocaleString() : "-"}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
@@ -430,7 +523,7 @@ export default function AccountStock() {
               </div>
               <div className="flex gap-2 items-center">
                 <Select value={vipCreditFilter} onValueChange={setVipCreditFilter}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="按积分筛选" />
                   </SelectTrigger>
                   <SelectContent className="z-50">
@@ -438,6 +531,19 @@ export default function AccountStock() {
                     {vipCreditCategories.map(category => (
                       <SelectItem key={category} value={category}>
                         {category}积分 ({vipCategoryStats[category] || 0})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={vipExpiryFilter} onValueChange={setVipExpiryFilter}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="按到期筛选" />
+                  </SelectTrigger>
+                  <SelectContent className="z-50">
+                    <SelectItem value="all">全部状态</SelectItem>
+                    {vipExpiryCategories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category} ({vipExpiryCategoryStats[category] || 0})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -487,18 +593,29 @@ export default function AccountStock() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* 积分分类统计 */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {vipCreditCategories.map(category => (
-                  <Badge 
-                    key={category} 
-                    variant={vipCreditFilter === category ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => setVipCreditFilter(vipCreditFilter === category ? "all" : category)}
-                  >
-                    {category}积分: {vipCategoryStats[category] || 0}
-                  </Badge>
-                ))}
+              {/* 搜索和筛选 */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-wrap gap-2">
+                  {vipCreditCategories.map(category => (
+                    <Badge 
+                      key={category} 
+                      variant={vipCreditFilter === category ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => setVipCreditFilter(vipCreditFilter === category ? "all" : category)}
+                    >
+                      {category}积分: {vipCategoryStats[category] || 0}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="搜索邮箱或邀请码..."
+                    value={vipSearchQuery}
+                    onChange={(e) => setVipSearchQuery(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
               </div>
               <div className="rounded-md border">
                 <Table>
@@ -507,35 +624,46 @@ export default function AccountStock() {
                       <TableHead>邮箱</TableHead>
                       <TableHead>积分</TableHead>
                       <TableHead>积分分类</TableHead>
+                      <TableHead>会员到期</TableHead>
+                      <TableHead>剩余天数</TableHead>
+                      <TableHead>会员状态</TableHead>
                       <TableHead>邀请码</TableHead>
-                      <TableHead>已用次数</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead>最后检查</TableHead>
+                      <TableHead>账号状态</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {vipAccountsLoading ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">加载中...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-500">加载中...</TableCell></TableRow>
                     ) : filteredVipAccounts.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                     ) : (
                       filteredVipAccounts.map((account) => (
                         <TableRow key={account.id}>
                           <TableCell className="font-medium">{account.email}</TableCell>
                           <TableCell>{account.totalCredits || "-"}</TableCell>
                           <TableCell>{getCreditCategoryBadge(account.totalCredits)}</TableCell>
+                          <TableCell className="text-sm">
+                            {account.membershipEndTime ? new Date(account.membershipEndTime).toLocaleDateString() : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const daysLeft = getMembershipDaysLeft(account.membershipEndTime);
+                              if (daysLeft === null) return "-";
+                              if (daysLeft <= 0) return <span className="text-red-500 font-medium">已过期</span>;
+                              if (daysLeft <= 7) return <span className="text-red-500 font-medium">{daysLeft}天</span>;
+                              if (daysLeft <= 30) return <span className="text-yellow-600 font-medium">{daysLeft}天</span>;
+                              return <span className="text-green-600 font-medium">{daysLeft}天</span>;
+                            })()}
+                          </TableCell>
+                          <TableCell>{getMembershipStatusBadge(account.membershipEndTime)}</TableCell>
                           <TableCell className="font-mono text-sm">{account.inviteCode || "-"}</TableCell>
-                          <TableCell>{account.inviteUsedCount || 0}</TableCell>
                           <TableCell>
                             {account.isBlocked ? (
                               <Badge variant="destructive">已封禁</Badge>
                             ) : (
                               <Badge className="bg-green-500">正常</Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500">
-                            {account.lastCheckedAt ? new Date(account.lastCheckedAt).toLocaleString() : "-"}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
