@@ -286,9 +286,11 @@ export default function CreditTasks() {
       case "completed":
         return <Badge className="bg-green-500">已完成</Badge>;
       case "failed":
-        return <Badge variant="destructive">失败</Badge>;
+        return <Badge variant="destructive">邀请失败</Badge>;
       case "paused":
         return <Badge variant="outline">已暂停</Badge>;
+      case "invite_failed":
+        return <Badge variant="destructive">邀请失败</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }

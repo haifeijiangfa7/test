@@ -934,7 +934,7 @@ export const appRouter = router({
           }
         }
 
-        const finalStatus = completed >= task.requiredInvites ? 'completed' : 'paused';
+        const finalStatus = completed >= task.requiredInvites ? 'completed' : 'failed';
         await db.updateCreditTask(input.taskId, { 
           status: finalStatus,
           completedAt: finalStatus === 'completed' ? new Date() : undefined,
