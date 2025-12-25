@@ -39,12 +39,19 @@ export default function CreditTasks() {
 
   const createMutation = trpc.creditTasks.create.useMutation({
     onSuccess: (result) => {
-      toast.success(`任务创建成功，需要邀请 ${result.requiredInvites} 次`);
+      toast.success(`任务创建成功，需要邀请 ${result.requiredInvites} 次，正在自动执行...`);
       utils.creditTasks.list.invalidate();
       utils.accounts.available.invalidate();
       utils.vipAccounts.available.invalidate();
       utils.stock.normal.list.invalidate();
       utils.stock.vip.list.invalidate();
+      // 任务创建成功后自动执行
+      if (result.taskId !== null && result.taskId !== undefined) {
+        const taskIdToExecute = result.taskId;
+        setTimeout(() => {
+          executeMutation.mutate({ taskId: taskIdToExecute });
+        }, 500);
+      }
     },
     onError: (error) => {
       toast.error(`创建失败: ${error.message}`);
@@ -379,10 +386,10 @@ export default function CreditTasks() {
                 <div className="space-y-2">
                   <Label>账号来源</Label>
                   <Select value={normalAccountId} onValueChange={setNormalAccountId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="relative z-10">
                       <SelectValue placeholder="随机获取" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-50 max-h-[300px] overflow-y-auto">
                       <SelectItem value="random">随机获取</SelectItem>
                       {accounts?.map((account) => (
                         <SelectItem key={account.id} value={account.id.toString()}>
@@ -399,10 +406,10 @@ export default function CreditTasks() {
                       setNormalTargetCredits(val);
                       if (val !== "custom") setNormalCustomCredits("");
                     }}>
-                      <SelectTrigger className={normalTargetCredits === "custom" ? "w-32" : "w-full"}>
+                      <SelectTrigger className={`relative z-10 ${normalTargetCredits === "custom" ? "w-32" : "w-full"}`}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-50">
                         <SelectItem value="1500">1500 积分</SelectItem>
                         <SelectItem value="2000">2000 积分</SelectItem>
                         <SelectItem value="2500">2500 积分</SelectItem>
@@ -476,10 +483,10 @@ export default function CreditTasks() {
                 <div className="space-y-2">
                   <Label>账号来源</Label>
                   <Select value={vipAccountId} onValueChange={setVipAccountId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="relative z-10">
                       <SelectValue placeholder="随机获取" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-50 max-h-[300px] overflow-y-auto">
                       <SelectItem value="random">随机获取</SelectItem>
                       {vipAccounts?.map((account) => (
                         <SelectItem key={account.id} value={account.id.toString()}>
@@ -496,10 +503,10 @@ export default function CreditTasks() {
                       setVipTargetCredits(val);
                       if (val !== "custom") setVipCustomCredits("");
                     }}>
-                      <SelectTrigger className={vipTargetCredits === "custom" ? "w-32" : "w-full"}>
+                      <SelectTrigger className={`relative z-10 ${vipTargetCredits === "custom" ? "w-32" : "w-full"}`}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-50">
                         <SelectItem value="1500">1500 积分</SelectItem>
                         <SelectItem value="2000">2000 积分</SelectItem>
                         <SelectItem value="2500">2500 积分</SelectItem>

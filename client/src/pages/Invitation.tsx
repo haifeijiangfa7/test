@@ -149,11 +149,20 @@ export default function Invitation() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>邀请者账号（可选）</Label>
-              <Select value={inviterAccountId} onValueChange={setInviterAccountId}>
-                <SelectTrigger>
+              <Select value={inviterAccountId} onValueChange={(value) => {
+                setInviterAccountId(value);
+                // 选择账号后自动填入邀请码
+                if (value && value !== "manual") {
+                  const account = accounts?.find(a => a.id.toString() === value);
+                  if (account?.inviteCode) {
+                    setInviteCode(`https://manus.im/invitation/${account.inviteCode}`);
+                  }
+                }
+              }}>
+                <SelectTrigger className="relative z-10">
                   <SelectValue placeholder="选择账号或手动输入邀请码" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50 max-h-[300px] overflow-y-auto">
                   <SelectItem value="manual">手动输入邀请码</SelectItem>
                   {accounts?.map((account) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
