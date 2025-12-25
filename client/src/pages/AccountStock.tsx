@@ -245,13 +245,14 @@ export default function AccountStock() {
                       <DialogTitle>批量导入普通账号</DialogTitle>
                       <DialogDescription>每行一个账号，格式：邮箱----密码----token</DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[400px]">
+                    <ScrollArea className="max-h-[400px] w-full">
                       <Textarea
                         placeholder="example@email.com----password123----eyJhbGciOiJIUzI1NiIs..."
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         rows={10}
-                        className="font-mono text-sm"
+                        className="font-mono text-sm w-full break-all"
+                        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
                       />
                     </ScrollArea>
                     <DialogFooter>
@@ -356,13 +357,14 @@ export default function AccountStock() {
                       <DialogTitle>批量导入会员账号</DialogTitle>
                       <DialogDescription>每行一个账号，格式：邮箱----密码----token</DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[400px]">
+                    <ScrollArea className="max-h-[400px] w-full">
                       <Textarea
                         placeholder="example@email.com----password123----eyJhbGciOiJIUzI1NiIs..."
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         rows={10}
-                        className="font-mono text-sm"
+                        className="font-mono text-sm w-full break-all"
+                        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
                       />
                     </ScrollArea>
                     <DialogFooter>
