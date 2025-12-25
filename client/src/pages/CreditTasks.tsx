@@ -118,11 +118,16 @@ export default function CreditTasks() {
       } else {
         toast.error(result.message);
       }
+      // 刷新所有相关数据
       utils.creditTasks.list.invalidate();
       utils.invitees.count.invalidate();
+      utils.invitees.eligible.invalidate();
+      utils.invitees.list.invalidate();
       utils.stats.get.invalidate();
       utils.stock.normal.list.invalidate();
       utils.stock.vip.list.invalidate();
+      utils.accounts.list.invalidate();
+      utils.vipAccounts.list.invalidate();
     },
     onError: (error) => {
       toast.error(`执行失败: ${error.message}`);

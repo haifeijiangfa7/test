@@ -732,8 +732,43 @@ export const appRouter = router({
                 credits: creditsAfter.freeCredits || 0,
                 creditCategory: manusApi.getCreditCategory(creditsAfter.freeCredits || 0),
               });
+              
+              // 同时添加到accounts表，使其可以作为新的邀请者账号
+              try {
+                const inviteCodeResult = await manusApi.getInvitationCodes(invitee.token, invitee.clientId);
+                const inviteCode = inviteCodeResult.invitationCodes?.[0]?.inviteCode || '';
+                await db.createAccount({
+                  email: invitee.email,
+                  password: invitee.password,
+                  token: invitee.token,
+                  clientId: invitee.clientId,
+                  totalCredits: creditsAfter.freeCredits || 0,
+                  inviteCode: inviteCode,
+                  inviteUsedCount: 0,
+                  lastCheckedAt: new Date(),
+                });
+              } catch (e) {
+                // 忽略添加到accounts表的错误（可能已存在）
+              }
+              
               await db.deleteInvitee(invitee.id);
               results.success++;
+              
+              // 如果有邀请者账号，刷新其积分信息
+              if (input.inviterAccountId) {
+                try {
+                  const inviterAccount = await db.getAccountById(input.inviterAccountId);
+                  if (inviterAccount) {
+                    const inviterCredits = await manusApi.getCredits(inviterAccount.token, inviterAccount.clientId);
+                    await db.updateAccount(input.inviterAccountId, {
+                      totalCredits: inviterCredits.freeCredits || inviterAccount.totalCredits,
+                      lastCheckedAt: new Date(),
+                    });
+                  }
+                } catch (e) {
+                  // 忽略刷新邀请者账号的错误
+                }
+              }
             } else {
               results.failed++;
               results.errors.push(`${invitee.email}: 邀请未生效`);

@@ -32,12 +32,16 @@ export default function Invitation() {
         console.log("邀请错误:", result.errors);
       }
       setSelectedInviteeIds([]);
+      // 刷新所有相关数据
       utils.invitees.eligible.invalidate();
       utils.invitees.count.invalidate();
+      utils.invitees.list.invalidate();
       utils.stats.get.invalidate();
       utils.stock.normal.list.invalidate();
       utils.stock.vip.list.invalidate();
       utils.accounts.list.invalidate();
+      utils.vipAccounts.list.invalidate();
+      utils.creditTasks.list.invalidate();
     },
     onError: (error) => {
       toast.error(`邀请失败: ${error.message}`);
