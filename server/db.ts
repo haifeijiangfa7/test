@@ -546,3 +546,60 @@ export async function getPromotionCodeStats() {
     available: totalCount?.count || 0,
   };
 }
+
+
+// 删除已提取普通账号
+export async function deleteExtractedNormalAccount(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(extractedNormalAccounts).where(eq(extractedNormalAccounts.id, id));
+}
+
+// 删除已提取会员账号
+export async function deleteExtractedVipAccount(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(extractedVipAccounts).where(eq(extractedVipAccounts.id, id));
+}
+
+// 删除所有已提取普通账号
+export async function deleteAllExtractedNormalAccounts() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(extractedNormalAccounts);
+}
+
+// 删除所有已提取会员账号
+export async function deleteAllExtractedVipAccounts() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(extractedVipAccounts);
+}
+
+// 删除已删除普通账号记录
+export async function deleteDeletedNormalAccount(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(deletedNormalAccounts).where(eq(deletedNormalAccounts.id, id));
+}
+
+// 删除已删除会员账号记录
+export async function deleteDeletedVipAccount(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(deletedVipAccounts).where(eq(deletedVipAccounts.id, id));
+}
+
+// 删除所有已删除普通账号记录
+export async function deleteAllDeletedNormalAccounts() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(deletedNormalAccounts);
+}
+
+// 删除所有已删除会员账号记录
+export async function deleteAllDeletedVipAccounts() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not connected');
+  await db.delete(deletedVipAccounts);
+}

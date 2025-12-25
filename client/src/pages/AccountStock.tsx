@@ -112,6 +112,76 @@ export default function AccountStock() {
   const { data: deletedNormal } = trpc.stock.deleted.normal.useQuery();
   const { data: deletedVip } = trpc.stock.deleted.vip.useQuery();
 
+  // 已提取记录删除mutations
+  const deleteExtractedNormalMutation = trpc.stock.extracted.deleteNormal.useMutation({
+    onSuccess: () => {
+      toast.success("删除成功");
+      utils.stock.extracted.normal.invalidate();
+    },
+  });
+  const deleteExtractedVipMutation = trpc.stock.extracted.deleteVip.useMutation({
+    onSuccess: () => {
+      toast.success("删除成功");
+      utils.stock.extracted.vip.invalidate();
+    },
+  });
+  const deleteAllExtractedNormalMutation = trpc.stock.extracted.deleteAllNormal.useMutation({
+    onSuccess: () => {
+      toast.success("已清空所有已提取普通账号记录");
+      utils.stock.extracted.normal.invalidate();
+    },
+  });
+  const deleteAllExtractedVipMutation = trpc.stock.extracted.deleteAllVip.useMutation({
+    onSuccess: () => {
+      toast.success("已清空所有已提取会员账号记录");
+      utils.stock.extracted.vip.invalidate();
+    },
+  });
+
+  // 已删除记录删除mutations
+  const deleteDeletedNormalMutation = trpc.stock.deleted.deleteNormal.useMutation({
+    onSuccess: () => {
+      toast.success("删除成功");
+      utils.stock.deleted.normal.invalidate();
+    },
+  });
+  const deleteDeletedVipMutation = trpc.stock.deleted.deleteVip.useMutation({
+    onSuccess: () => {
+      toast.success("删除成功");
+      utils.stock.deleted.vip.invalidate();
+    },
+  });
+  const deleteAllDeletedNormalMutation = trpc.stock.deleted.deleteAllNormal.useMutation({
+    onSuccess: () => {
+      toast.success("已清空所有已删除普通账号记录");
+      utils.stock.deleted.normal.invalidate();
+    },
+  });
+  const deleteAllDeletedVipMutation = trpc.stock.deleted.deleteAllVip.useMutation({
+    onSuccess: () => {
+      toast.success("已清空所有已删除会员账号记录");
+      utils.stock.deleted.vip.invalidate();
+    },
+  });
+
+  // 删除原因中文化
+  const getDeleteReasonChinese = (reason: string | null | undefined): string => {
+    if (!reason) return "-";
+    const reasonMap: Record<string, string> = {
+      'ineligible': '不符合条件',
+      'blocked': '已封禁',
+      'expired': '已过期',
+      'manual': '手动删除',
+      'no_sms': '未短信验证',
+      'low_credits': '积分不足',
+      'invalid_token': 'Token无效',
+      'api_error': 'API错误',
+      'duplicate': '重复账号',
+      'unknown': '未知原因',
+    };
+    return reasonMap[reason.toLowerCase()] || reason;
+  };
+
   // 页面加载时自动刷新所有账号数据
   const hasAutoRefreshed = useRef(false);
   useEffect(() => {
@@ -160,14 +230,19 @@ export default function AccountStock() {
     return diffDays;
   };
 
-  // 获取会员到期分类
+  // 获取会员到期分类（7654321天筛选）
   const getExpiryCategory = (endTime: Date | string | null | undefined): string => {
     const daysLeft = getMembershipDaysLeft(endTime);
     if (daysLeft === null) return "未知";
     if (daysLeft <= 0) return "已过期";
-    if (daysLeft <= 7) return "7天内";
-    if (daysLeft <= 30) return "30天内";
-    return "30天以上";
+    if (daysLeft === 1) return "1天";
+    if (daysLeft === 2) return "2天";
+    if (daysLeft === 3) return "3天";
+    if (daysLeft === 4) return "4天";
+    if (daysLeft === 5) return "5天";
+    if (daysLeft === 6) return "6天";
+    if (daysLeft === 7) return "7天";
+    return "7天以上";
   };
 
   // 获取会员状态标签
@@ -296,7 +371,7 @@ export default function AccountStock() {
       const category = getExpiryCategory(account.membershipEndTime);
       categories.add(category);
     });
-    const order = ["已过期", "7天内", "30天内", "30天以上", "未知"];
+    const order = ["已过期", "1天", "2天", "3天", "4天", "5天", "6天", "7天", "7天以上", "未知"];
     return Array.from(categories).sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }, [vipAccounts]);
 
@@ -692,9 +767,20 @@ export default function AccountStock() {
         <TabsContent value="extracted">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>已提取普通账号</CardTitle>
-                <CardDescription>共 {extractedNormal?.length || 0} 条记录</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>已提取普通账号</CardTitle>
+                  <CardDescription>共 {extractedNormal?.length || 0} 条记录</CardDescription>
+                </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => deleteAllExtractedNormalMutation.mutate()}
+                  disabled={deleteAllExtractedNormalMutation.isPending || !extractedNormal?.length}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  一键清空
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
@@ -705,19 +791,30 @@ export default function AccountStock() {
                         <TableHead>积分</TableHead>
                         <TableHead>积分分类</TableHead>
                         <TableHead>提取时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {extractedNormal?.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                       ) : (
                         extractedNormal?.map((record) => (
                           <TableRow key={record.id}>
                             <TableCell className="font-medium">{record.email}</TableCell>
                             <TableCell>{record.credits}</TableCell>
-                            <TableCell>{record.creditCategory || "-"}</TableCell>
+                            <TableCell>{getCreditCategoryBadge(record.credits)}</TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {new Date(record.extractedAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => copyAccountInfo(record.email, record.password)} title="复制">
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteExtractedNormalMutation.mutate({ id: record.id })} className="text-red-500 hover:text-red-600" title="删除">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -729,9 +826,20 @@ export default function AccountStock() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>已提取会员账号</CardTitle>
-                <CardDescription>共 {extractedVip?.length || 0} 条记录</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>已提取会员账号</CardTitle>
+                  <CardDescription>共 {extractedVip?.length || 0} 条记录</CardDescription>
+                </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => deleteAllExtractedVipMutation.mutate()}
+                  disabled={deleteAllExtractedVipMutation.isPending || !extractedVip?.length}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  一键清空
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
@@ -742,19 +850,30 @@ export default function AccountStock() {
                         <TableHead>积分</TableHead>
                         <TableHead>积分分类</TableHead>
                         <TableHead>提取时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {extractedVip?.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                       ) : (
                         extractedVip?.map((record) => (
                           <TableRow key={record.id}>
                             <TableCell className="font-medium">{record.email}</TableCell>
                             <TableCell>{record.credits}</TableCell>
-                            <TableCell>{record.creditCategory || "-"}</TableCell>
+                            <TableCell>{getCreditCategoryBadge(record.credits)}</TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {new Date(record.extractedAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => copyAccountInfo(record.email, record.password)} title="复制">
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteExtractedVipMutation.mutate({ id: record.id })} className="text-red-500 hover:text-red-600" title="删除">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -771,9 +890,20 @@ export default function AccountStock() {
         <TabsContent value="deleted">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>已删除普通账号</CardTitle>
-                <CardDescription>共 {deletedNormal?.length || 0} 条记录</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>已删除普通账号</CardTitle>
+                  <CardDescription>共 {deletedNormal?.length || 0} 条记录</CardDescription>
+                </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => deleteAllDeletedNormalMutation.mutate()}
+                  disabled={deleteAllDeletedNormalMutation.isPending || !deletedNormal?.length}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  一键清空
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
@@ -784,19 +914,30 @@ export default function AccountStock() {
                         <TableHead>积分</TableHead>
                         <TableHead>删除原因</TableHead>
                         <TableHead>删除时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {deletedNormal?.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                       ) : (
                         deletedNormal?.map((record) => (
                           <TableRow key={record.id}>
                             <TableCell className="font-medium">{record.email}</TableCell>
                             <TableCell>{record.credits}</TableCell>
-                            <TableCell>{record.deleteReason || "-"}</TableCell>
+                            <TableCell>{getDeleteReasonChinese(record.deleteReason)}</TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {new Date(record.deletedAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => copyAccountInfo(record.email, record.password)} title="复制">
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteDeletedNormalMutation.mutate({ id: record.id })} className="text-red-500 hover:text-red-600" title="删除">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -808,9 +949,20 @@ export default function AccountStock() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>已删除会员账号</CardTitle>
-                <CardDescription>共 {deletedVip?.length || 0} 条记录</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>已删除会员账号</CardTitle>
+                  <CardDescription>共 {deletedVip?.length || 0} 条记录</CardDescription>
+                </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => deleteAllDeletedVipMutation.mutate()}
+                  disabled={deleteAllDeletedVipMutation.isPending || !deletedVip?.length}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  一键清空
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
@@ -821,19 +973,30 @@ export default function AccountStock() {
                         <TableHead>积分</TableHead>
                         <TableHead>删除原因</TableHead>
                         <TableHead>删除时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {deletedVip?.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">暂无数据</TableCell></TableRow>
                       ) : (
                         deletedVip?.map((record) => (
                           <TableRow key={record.id}>
                             <TableCell className="font-medium">{record.email}</TableCell>
                             <TableCell>{record.credits}</TableCell>
-                            <TableCell>{record.deleteReason || "-"}</TableCell>
+                            <TableCell>{getDeleteReasonChinese(record.deleteReason)}</TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {new Date(record.deletedAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => copyAccountInfo(record.email, record.password)} title="复制">
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteDeletedVipMutation.mutate({ id: record.id })} className="text-red-500 hover:text-red-600" title="删除">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))

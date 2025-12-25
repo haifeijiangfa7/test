@@ -1226,6 +1226,26 @@ export const appRouter = router({
       vip: publicProcedure.query(async () => {
         return await db.getAllExtractedVipAccounts();
       }),
+      deleteNormal: publicProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await db.deleteExtractedNormalAccount(input.id);
+          return { success: true };
+        }),
+      deleteVip: publicProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await db.deleteExtractedVipAccount(input.id);
+          return { success: true };
+        }),
+      deleteAllNormal: publicProcedure.mutation(async () => {
+        await db.deleteAllExtractedNormalAccounts();
+        return { success: true };
+      }),
+      deleteAllVip: publicProcedure.mutation(async () => {
+        await db.deleteAllExtractedVipAccounts();
+        return { success: true };
+      }),
     }),
     deleted: router({
       normal: publicProcedure.query(async () => {
@@ -1233,6 +1253,26 @@ export const appRouter = router({
       }),
       vip: publicProcedure.query(async () => {
         return await db.getAllDeletedVipAccounts();
+      }),
+      deleteNormal: publicProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await db.deleteDeletedNormalAccount(input.id);
+          return { success: true };
+        }),
+      deleteVip: publicProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await db.deleteDeletedVipAccount(input.id);
+          return { success: true };
+        }),
+      deleteAllNormal: publicProcedure.mutation(async () => {
+        await db.deleteAllDeletedNormalAccounts();
+        return { success: true };
+      }),
+      deleteAllVip: publicProcedure.mutation(async () => {
+        await db.deleteAllDeletedVipAccounts();
+        return { success: true };
       }),
     }),
   }),
@@ -1426,47 +1466,68 @@ export const appRouter = router({
         const accountsToProcess = accounts.slice(0, input.count);
         
         for (const account of accountsToProcess) {
-          try {
-            // 获取随机兑换码
-            const randomCode = await db.getRandomAvailablePromotionCode();
-            if (!randomCode) {
-              results.failed++;
-              results.errors.push(`${account.email}: 没有可用的兑换码`);
-              continue;
-            }
+          let retryCount = 0;
+          const maxRetries = 3;
+          let lastError = '';
+          let success = false;
 
-            // 执行兑换
-            const result = await manusApi.redeemPromotionCode(account.token, account.clientId, randomCode.code);
-            
-            if (result.success) {
-              // 兑换码可循环利用，不标记为已使用
-              
-              // 刷新账号积分
-              const credits = await manusApi.getCredits(account.token, account.clientId);
-              
-              // 更新账号积分
-              if (input.accountType === 'normal') {
-                await db.updateAccount(account.id, {
-                  totalCredits: credits.totalCredits,
-                  freeCredits: credits.freeCredits,
-                  lastCheckedAt: new Date(),
-                });
-              } else {
-                await db.updateVipAccount(account.id, {
-                  totalCredits: credits.totalCredits,
-                  freeCredits: credits.freeCredits,
-                  lastCheckedAt: new Date(),
-                });
+          while (retryCount < maxRetries && !success) {
+            try {
+              // 获取随机兑换码
+              const randomCode = await db.getRandomAvailablePromotionCode();
+              if (!randomCode) {
+                lastError = '没有可用的兑换码';
+                retryCount++;
+                continue;
               }
+
+              // 执行兑换
+              const result = await manusApi.redeemPromotionCode(account.token, account.clientId, randomCode.code);
               
-              results.success++;
-            } else {
-              results.failed++;
-              results.errors.push(`${account.email}: ${result.error || '兑换失败'}`);
+              if (result.success) {
+                // 兑换码可循环利用，不标记为已使用
+                
+                // 刷新账号积分
+                const credits = await manusApi.getCredits(account.token, account.clientId);
+                
+                // 更新账号积分
+                if (input.accountType === 'normal') {
+                  await db.updateAccount(account.id, {
+                    totalCredits: credits.totalCredits,
+                    freeCredits: credits.freeCredits,
+                    lastCheckedAt: new Date(),
+                  });
+                } else {
+                  await db.updateVipAccount(account.id, {
+                    totalCredits: credits.totalCredits,
+                    freeCredits: credits.freeCredits,
+                    lastCheckedAt: new Date(),
+                  });
+                }
+                
+                results.success++;
+                success = true;
+              } else {
+                lastError = result.error || '兑换失败';
+                retryCount++;
+                // 重试前等待1秒
+                if (retryCount < maxRetries) {
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+              }
+            } catch (error: any) {
+              lastError = error.message;
+              retryCount++;
+              // 重试前等待1秒
+              if (retryCount < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
             }
-          } catch (error: any) {
+          }
+
+          if (!success) {
             results.failed++;
-            results.errors.push(`${account.email}: ${error.message}`);
+            results.errors.push(`${account.email}: ${lastError} (已重试${maxRetries}次)`);
           }
         }
 
