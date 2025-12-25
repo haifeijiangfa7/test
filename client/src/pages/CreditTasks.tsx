@@ -22,11 +22,13 @@ export default function CreditTasks() {
   // 普通账号模式
   const [normalAccountId, setNormalAccountId] = useState("random");
   const [normalTargetCredits, setNormalTargetCredits] = useState("2500");
+  const [normalCustomCredits, setNormalCustomCredits] = useState("");
   const [normalMakeCount, setNormalMakeCount] = useState("1");
   
   // 会员账号模式
   const [vipAccountId, setVipAccountId] = useState("random");
   const [vipTargetCredits, setVipTargetCredits] = useState("2500");
+  const [vipCustomCredits, setVipCustomCredits] = useState("");
   const [vipMakeCount, setVipMakeCount] = useState("1");
 
   const utils = trpc.useUtils();
@@ -116,7 +118,7 @@ export default function CreditTasks() {
           targetEmail: randomAccount.email,
           targetPassword: randomAccount.password,
           initialCredits: randomAccount.totalCredits || 0,
-          targetCredits: parseInt(normalTargetCredits),
+          targetCredits: getNormalTargetCreditsValue(),
         });
       }
     } else {
@@ -135,10 +137,26 @@ export default function CreditTasks() {
           targetEmail: account.email,
           targetPassword: account.password,
           initialCredits: account.totalCredits || 0,
-          targetCredits: parseInt(normalTargetCredits),
+          targetCredits: getNormalTargetCreditsValue(),
         });
       }
     }
+  };
+
+  // 获取普通账号模式的实际目标积分值
+  const getNormalTargetCreditsValue = () => {
+    if (normalTargetCredits === "custom") {
+      return parseInt(normalCustomCredits) || 2500;
+    }
+    return parseInt(normalTargetCredits);
+  };
+
+  // 获取会员账号模式的实际目标积分值
+  const getVipTargetCreditsValue = () => {
+    if (vipTargetCredits === "custom") {
+      return parseInt(vipCustomCredits) || 2500;
+    }
+    return parseInt(vipTargetCredits);
   };
 
   const handleCreateVipAccount = () => {
@@ -160,7 +178,7 @@ export default function CreditTasks() {
           targetEmail: randomAccount.email,
           targetPassword: randomAccount.password,
           initialCredits: randomAccount.totalCredits || 0,
-          targetCredits: parseInt(vipTargetCredits),
+          targetCredits: getVipTargetCreditsValue(),
         });
       }
     } else {
@@ -179,7 +197,7 @@ export default function CreditTasks() {
           targetEmail: account.email,
           targetPassword: account.password,
           initialCredits: account.totalCredits || 0,
-          targetCredits: parseInt(vipTargetCredits),
+          targetCredits: getVipTargetCreditsValue(),
         });
       }
     }
@@ -376,21 +394,38 @@ export default function CreditTasks() {
                 </div>
                 <div className="space-y-2">
                   <Label>目标积分</Label>
-                  <Select value={normalTargetCredits} onValueChange={setNormalTargetCredits}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1500">1500 积分</SelectItem>
-                      <SelectItem value="2000">2000 积分</SelectItem>
-                      <SelectItem value="2500">2500 积分</SelectItem>
-                      <SelectItem value="3000">3000 积分</SelectItem>
-                      <SelectItem value="3500">3500 积分</SelectItem>
-                      <SelectItem value="4000">4000 积分</SelectItem>
-                      <SelectItem value="4500">4500 积分</SelectItem>
-                      <SelectItem value="5000">5000+ 积分</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={normalTargetCredits} onValueChange={(val) => {
+                      setNormalTargetCredits(val);
+                      if (val !== "custom") setNormalCustomCredits("");
+                    }}>
+                      <SelectTrigger className={normalTargetCredits === "custom" ? "w-32" : "w-full"}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1500">1500 积分</SelectItem>
+                        <SelectItem value="2000">2000 积分</SelectItem>
+                        <SelectItem value="2500">2500 积分</SelectItem>
+                        <SelectItem value="3000">3000 积分</SelectItem>
+                        <SelectItem value="3500">3500 积分</SelectItem>
+                        <SelectItem value="4000">4000 积分</SelectItem>
+                        <SelectItem value="4500">4500 积分</SelectItem>
+                        <SelectItem value="5000">5000+ 积分</SelectItem>
+                        <SelectItem value="custom">手动输入</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {normalTargetCredits === "custom" && (
+                      <Input
+                        type="number"
+                        min="500"
+                        step="500"
+                        placeholder="输入积分"
+                        value={normalCustomCredits}
+                        onChange={(e) => setNormalCustomCredits(e.target.value)}
+                        className="flex-1"
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>制作个数</Label>
@@ -410,7 +445,7 @@ export default function CreditTasks() {
               <p className="text-sm text-gray-500">
                 可用普通账号: {accounts?.length || 0} 个 | 
                 可用被邀请账号: {inviteeCount?.count || 0} 个 |
-                需要邀请: {calculateRequiredInvites(parseInt(normalTargetCredits), 1000) * parseInt(normalMakeCount || "1")} 次
+                需要邀请: {calculateRequiredInvites(getNormalTargetCreditsValue(), 1000) * parseInt(normalMakeCount || "1")} 次
               </p>
               <Button 
                 onClick={handleCreateNormalAccount}
@@ -456,21 +491,38 @@ export default function CreditTasks() {
                 </div>
                 <div className="space-y-2">
                   <Label>目标积分</Label>
-                  <Select value={vipTargetCredits} onValueChange={setVipTargetCredits}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1500">1500 积分</SelectItem>
-                      <SelectItem value="2000">2000 积分</SelectItem>
-                      <SelectItem value="2500">2500 积分</SelectItem>
-                      <SelectItem value="3000">3000 积分</SelectItem>
-                      <SelectItem value="3500">3500 积分</SelectItem>
-                      <SelectItem value="4000">4000 积分</SelectItem>
-                      <SelectItem value="4500">4500 积分</SelectItem>
-                      <SelectItem value="5000">5000+ 积分</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={vipTargetCredits} onValueChange={(val) => {
+                      setVipTargetCredits(val);
+                      if (val !== "custom") setVipCustomCredits("");
+                    }}>
+                      <SelectTrigger className={vipTargetCredits === "custom" ? "w-32" : "w-full"}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1500">1500 积分</SelectItem>
+                        <SelectItem value="2000">2000 积分</SelectItem>
+                        <SelectItem value="2500">2500 积分</SelectItem>
+                        <SelectItem value="3000">3000 积分</SelectItem>
+                        <SelectItem value="3500">3500 积分</SelectItem>
+                        <SelectItem value="4000">4000 积分</SelectItem>
+                        <SelectItem value="4500">4500 积分</SelectItem>
+                        <SelectItem value="5000">5000+ 积分</SelectItem>
+                        <SelectItem value="custom">手动输入</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {vipTargetCredits === "custom" && (
+                      <Input
+                        type="number"
+                        min="500"
+                        step="500"
+                        placeholder="输入积分"
+                        value={vipCustomCredits}
+                        onChange={(e) => setVipCustomCredits(e.target.value)}
+                        className="flex-1"
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>制作个数</Label>
@@ -490,7 +542,7 @@ export default function CreditTasks() {
               <p className="text-sm text-gray-500">
                 可用会员账号: {vipAccounts?.length || 0} 个 | 
                 可用被邀请账号: {inviteeCount?.count || 0} 个 |
-                需要邀请: {calculateRequiredInvites(parseInt(vipTargetCredits), 1000) * parseInt(vipMakeCount || "1")} 次
+                需要邀请: {calculateRequiredInvites(getVipTargetCreditsValue(), 1000) * parseInt(vipMakeCount || "1")} 次
               </p>
               <Button 
                 onClick={handleCreateVipAccount}
