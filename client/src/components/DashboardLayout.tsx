@@ -19,7 +19,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { 
   LayoutDashboard, 
@@ -36,17 +35,17 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-import { Button } from "./ui/button";
+import Login from "@/pages/Login";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "首页", path: "/" },
   { icon: Users, label: "被邀请账号", path: "/invitees" },
   { icon: Send, label: "执行邀请", path: "/invitation" },
   { icon: Target, label: "制作积分账号", path: "/credit-tasks" },
-  { icon: Gift, label: "兑换码管理", path: "/promotion-codes" },
   { icon: History, label: "邀请记录", path: "/logs" },
   { icon: FileText, label: "制作记录", path: "/account-logs" },
   { icon: Package, label: "账号库存", path: "/account-stock" },
+  { icon: Gift, label: "兑换码管理", path: "/promotion-codes" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -74,32 +73,7 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full bg-white rounded-2xl shadow-xl">
-          <div className="flex flex-col items-center gap-6">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
-              <Users className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-center text-gray-900">
-              Manus账号邀请管理系统
-            </h1>
-            <p className="text-sm text-gray-500 text-center max-w-sm">
-              请登录以访问账号管理功能
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all bg-blue-600 hover:bg-blue-700"
-          >
-            登录
-          </Button>
-        </div>
-      </div>
-    );
+    return <Login />;
   }
 
   return (

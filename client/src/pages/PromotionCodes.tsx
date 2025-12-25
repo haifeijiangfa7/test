@@ -1,33 +1,29 @@
-import { useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { 
-  Upload, Trash2, Search, Gift, CheckCircle, XCircle, Clock,
-  RefreshCw
-} from "lucide-react";
+import { Plus, Trash2, Gift, Search, Copy } from "lucide-react";
 
 export default function PromotionCodes() {
-  
   const [importData, setImportData] = useState("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const { data: codes, refetch, isLoading } = trpc.promotionCodes.list.useQuery();
-  const { data: stats, refetch: refetchStats } = trpc.promotionCodes.stats.useQuery();
+  const utils = trpc.useUtils();
+  const { data: codes, isLoading } = trpc.promotionCodes.list.useQuery();
 
   const importMutation = trpc.promotionCodes.import.useMutation({
     onSuccess: (result) => {
-      toast.success(`导入完成: 成功${result.success}个, 重复${result.duplicate}个, 失败${result.failed}个`);
+      toast.success(`导入完成: 成功${result.success}个, 重复${result.duplicates}个`);
+      setImportDialogOpen(false);
       setImportData("");
-      refetch();
-      refetchStats();
+      utils.promotionCodes.list.invalidate();
     },
     onError: (error) => {
       toast.error(`导入失败: ${error.message}`);
@@ -37,269 +33,211 @@ export default function PromotionCodes() {
   const deleteMutation = trpc.promotionCodes.delete.useMutation({
     onSuccess: () => {
       toast.success("删除成功");
-      refetch();
-      refetchStats();
+      utils.promotionCodes.list.invalidate();
     },
     onError: (error) => {
       toast.error(`删除失败: ${error.message}`);
     },
   });
 
-  const batchDeleteMutation = trpc.batchDelete.accounts.useMutation({
-    onSuccess: (result) => {
-      toast.success(`批量删除成功: 已删除 ${result.count} 条记录`);
-      setSelectedIds([]);
-      refetch();
-      refetchStats();
-    },
-    onError: (error) => {
-      toast.error(`批量删除失败: ${error.message}`);
-    },
+  const handleImport = () => {
+    if (!importData.trim()) {
+      toast.error("请输入兑换码");
+      return;
+    }
+    importMutation.mutate({ data: importData });
+  };
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success("已复制兑换码");
+  };
+
+  // 筛选兑换码
+  const filteredCodes = codes?.filter(code => {
+    if (!searchQuery.trim()) return true;
+    return code.code.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  // 筛选和搜索
-  const filteredCodes = useMemo(() => {
-    if (!codes) return [];
-    return codes.filter(code => {
-      // 状态筛选
-      if (statusFilter !== "all" && code.status !== statusFilter) return false;
-      // 搜索
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return code.code.toLowerCase().includes(query) ||
-               (code.usedByEmail && code.usedByEmail.toLowerCase().includes(query));
-      }
-      return true;
-    });
-  }, [codes, statusFilter, searchQuery]);
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(filteredCodes.map(c => c.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleSelect = (id: number, checked: boolean) => {
-    if (checked) {
-      setSelectedIds([...selectedIds, id]);
-    } else {
-      setSelectedIds(selectedIds.filter(i => i !== id));
-    }
-  };
-
-  const handleBatchDelete = async () => {
-    if (selectedIds.length === 0) return;
-    if (!confirm(`确定要删除选中的 ${selectedIds.length} 个兑换码吗？`)) return;
-    
-    // 逐个删除
-    for (const id of selectedIds) {
-      await deleteMutation.mutateAsync({ id });
-    }
-    setSelectedIds([]);
-    refetch();
-    refetchStats();
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'available':
-        return <Badge className="bg-green-500"><Clock className="w-3 h-3 mr-1" />可用</Badge>;
-      case 'used':
-        return <Badge className="bg-blue-500"><CheckCircle className="w-3 h-3 mr-1" />已使用</Badge>;
-      case 'invalid':
-        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />无效</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+  // 统计信息
+  const totalCodes = codes?.length || 0;
+  const usedCodes = codes?.filter(c => c.usedCount > 0).length || 0;
+  const unusedCodes = totalCodes - usedCodes;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">兑换码管理</h1>
-          <p className="text-muted-foreground">管理和导入兑换码</p>
+          <h1 className="text-2xl font-bold text-gray-900">兑换码管理</h1>
+          <p className="text-gray-500 mt-1">管理和导入兑换码，兑换码可循环使用</p>
         </div>
-        <Button variant="outline" onClick={() => { refetch(); refetchStats(); }}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          刷新
-        </Button>
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-purple-600 hover:bg-purple-700">
+              <Plus className="w-4 h-4 mr-2" />
+              批量导入
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>批量导入兑换码</DialogTitle>
+              <DialogDescription>
+                每行一个兑换码，系统会自动去重
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="请输入兑换码，每行一个&#10;例如：&#10;ABC123&#10;DEF456&#10;GHI789"
+              value={importData}
+              onChange={(e) => setImportData(e.target.value)}
+              className="min-h-[300px] font-mono"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+                取消
+              </Button>
+              <Button 
+                onClick={handleImport} 
+                disabled={importMutation.isPending}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {importMutation.isPending ? "导入中..." : "导入"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>总数</CardDescription>
-            <CardTitle className="text-3xl">{stats?.total || 0}</CardTitle>
-          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">总兑换码</p>
+                <p className="text-2xl font-bold">{totalCodes}</p>
+              </div>
+              <Badge className="bg-purple-500">总计</Badge>
+            </div>
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>可用</CardDescription>
-            <CardTitle className="text-3xl text-green-500">{stats?.available || 0}</CardTitle>
-          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">已使用过</p>
+                <p className="text-2xl font-bold">{usedCodes}</p>
+              </div>
+              <Badge className="bg-green-500">已用</Badge>
+            </div>
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>已使用</CardDescription>
-            <CardTitle className="text-3xl text-blue-500">{stats?.used || 0}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>无效</CardDescription>
-            <CardTitle className="text-3xl text-red-500">{stats?.invalid || 0}</CardTitle>
-          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">未使用过</p>
+                <p className="text-2xl font-bold">{unusedCodes}</p>
+              </div>
+              <Badge className="bg-blue-500">可用</Badge>
+            </div>
+          </CardContent>
         </Card>
       </div>
-
-      {/* 导入区域 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="w-5 h-5" />
-            批量导入兑换码
-          </CardTitle>
-          <CardDescription>每行一个兑换码，系统会自动去重</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="请输入兑换码，每行一个..."
-            value={importData}
-            onChange={(e) => setImportData(e.target.value)}
-            rows={6}
-          />
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">
-              共 {importData.trim().split('\n').filter(l => l.trim()).length} 个兑换码
-            </span>
-            <Button 
-              onClick={() => importMutation.mutate({ data: importData })}
-              disabled={!importData.trim() || importMutation.isPending}
-            >
-              <Gift className="w-4 h-4 mr-2" />
-              {importMutation.isPending ? "导入中..." : "导入兑换码"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 兑换码列表 */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>兑换码列表</CardTitle>
-              <CardDescription>共 {filteredCodes.length} 个兑换码</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-purple-500" />
+                兑换码列表
+              </CardTitle>
+              <CardDescription>所有兑换码可循环使用，不会被消耗</CardDescription>
             </div>
-            <div className="flex items-center gap-4">
-              {/* 状态筛选 */}
-              <select
-                className="border rounded px-3 py-2 text-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">全部状态</option>
-                <option value="available">可用</option>
-                <option value="used">已使用</option>
-                <option value="invalid">无效</option>
-              </select>
-              {/* 搜索框 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="搜索兑换码或邮箱..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="搜索兑换码..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-64"
+              />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {/* 批量操作栏 */}
-          {selectedIds.length > 0 && (
-            <div className="mb-4 p-3 bg-muted rounded-lg flex items-center justify-between">
-              <span className="text-sm">已选择 {selectedIds.length} 项</span>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={handleBatchDelete}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                批量删除
-              </Button>
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">加载中...</div>
-          ) : filteredCodes.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">暂无兑换码</div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="p-3 text-left w-12">
-                      <Checkbox
-                        checked={selectedIds.length === filteredCodes.length && filteredCodes.length > 0}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </th>
-                    <th className="p-3 text-left">兑换码</th>
-                    <th className="p-3 text-left">状态</th>
-                    <th className="p-3 text-left">使用者</th>
-                    <th className="p-3 text-left">积分变化</th>
-                    <th className="p-3 text-left">使用时间</th>
-                    <th className="p-3 text-left">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCodes.map((code) => (
-                    <tr key={code.id} className="border-t hover:bg-muted/50">
-                      <td className="p-3">
-                        <Checkbox
-                          checked={selectedIds.includes(code.id)}
-                          onCheckedChange={(checked) => handleSelect(code.id, checked as boolean)}
-                        />
-                      </td>
-                      <td className="p-3 font-mono text-sm">{code.code}</td>
-                      <td className="p-3">{getStatusBadge(code.status)}</td>
-                      <td className="p-3 text-sm">{code.usedByEmail || '-'}</td>
-                      <td className="p-3 text-sm">
-                        {code.creditsBefore !== null && code.creditsAfter !== null ? (
-                          <span className="text-green-600">
-                            {code.creditsBefore} → {code.creditsAfter} (+{code.creditsAfter - code.creditsBefore})
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-sm text-muted-foreground">
-                        {code.usedAt ? new Date(code.usedAt).toLocaleString() : '-'}
-                      </td>
-                      <td className="p-3">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>兑换码</TableHead>
+                <TableHead>使用次数</TableHead>
+                <TableHead>最后使用时间</TableHead>
+                <TableHead>创建时间</TableHead>
+                <TableHead className="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    加载中...
+                  </TableCell>
+                </TableRow>
+              ) : filteredCodes?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    暂无兑换码
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredCodes?.map((code) => (
+                  <TableRow key={code.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
+                          {code.code}
+                        </code>
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm('确定要删除这个兑换码吗？')) {
-                              deleteMutation.mutate({ id: code.id });
-                            }
-                          }}
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => copyCode(code.code)}
                         >
-                          <Trash2 className="w-4 h-4 text-red-500" />
+                          <Copy className="w-3 h-3" />
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={code.usedCount > 0 ? "default" : "secondary"}>
+                        {code.usedCount} 次
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {code.lastUsedAt 
+                        ? new Date(code.lastUsedAt).toLocaleString("zh-CN")
+                        : "-"
+                      }
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {new Date(code.createdAt).toLocaleString("zh-CN")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate({ id: code.id })}
+                        disabled={deleteMutation.isPending}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

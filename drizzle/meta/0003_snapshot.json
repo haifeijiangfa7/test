@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "cf25fcd8-e4e8-4834-b852-75e684c9b87d",
+  "id": "e4bb9984-51dc-4119-a7cc-048151dd4472",
   "prevId": "c211f7d8-9cc3-4534-886d-4e9c7edc16e6",
   "tables": {
     "accounts": {
@@ -156,21 +156,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": false
-        },
-        "hasRedeemedCode": {
-          "name": "hasRedeemedCode",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": false
-        },
-        "lastRedeemedAt": {
-          "name": "lastRedeemedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "registeredAt": {
           "name": "registeredAt",
@@ -1116,6 +1101,67 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "promotion_codes": {
+      "name": "promotion_codes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "usedCount": {
+          "name": "usedCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "lastUsedAt": {
+          "name": "lastUsedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "promotion_codes_id": {
+          "name": "promotion_codes_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "promotion_codes_code_unique": {
+          "name": "promotion_codes_code_unique",
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
     "users": {
       "name": "users",
       "columns": {
@@ -1545,21 +1591,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": false
-        },
-        "hasRedeemedCode": {
-          "name": "hasRedeemedCode",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": false
-        },
-        "lastRedeemedAt": {
-          "name": "lastRedeemedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "registeredAt": {
           "name": "registeredAt",

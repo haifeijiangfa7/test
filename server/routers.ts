@@ -6,10 +6,57 @@ import { z } from "zod";
 import * as db from "./db";
 import * as manusApi from "./manusApi";
 
+// 本地管理员账号配置
+const ADMIN_USERNAME = "admin";
+const ADMIN_PASSWORD = "Asd123456.";
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    login: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        if (input.username !== ADMIN_USERNAME || input.password !== ADMIN_PASSWORD) {
+          throw new Error("用户名或密码错误");
+        }
+        
+        // 创建或获取管理员用户
+        const adminOpenId = "local-admin-user";
+        let user = await db.getUserByOpenId(adminOpenId);
+        if (!user) {
+          await db.upsertUser({
+            openId: adminOpenId,
+            name: "Admin",
+            email: "admin@local",
+            loginMethod: "password",
+            lastSignedIn: new Date(),
+          });
+          user = await db.getUserByOpenId(adminOpenId);
+        } else {
+          await db.upsertUser({
+            openId: adminOpenId,
+            lastSignedIn: new Date(),
+          });
+        }
+        
+        // 创建本地session token
+        const { SignJWT } = await import("jose");
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET || "default-secret");
+        const token = await new SignJWT({
+          openId: adminOpenId,
+          appId: "local",
+          name: "Admin",
+        })
+          .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+          .setExpirationTime(Math.floor((Date.now() + 365 * 24 * 60 * 60 * 1000) / 1000))
+          .sign(secret);
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+        
+        return { success: true, user };
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -49,14 +96,6 @@ export const appRouter = router({
           }
 
           const [email, password, token] = parts.map(p => p.trim());
-          
-          // 检查会员账号表中是否已存在（会员账号优先级更高）
-          const existingVip = await db.getVipAccountByEmail(email);
-          if (existingVip) {
-            results.failed++;
-            results.errors.push(`账号已存在于会员账号表: ${email}`);
-            continue;
-          }
           
           const existing = await db.getAccountByEmail(email);
           if (existing) {
@@ -271,12 +310,6 @@ export const appRouter = router({
             results.failed++;
             results.errors.push(`账号已存在: ${email}`);
             continue;
-          }
-          
-          // 检查普通账号表中是否存在，如果存在则删除（会员账号优先级更高）
-          const existingNormal = await db.getAccountByEmail(email);
-          if (existingNormal) {
-            await db.deleteAccount(existingNormal.id);
           }
 
           const tokenInfo = manusApi.parseToken(token);
@@ -1285,38 +1318,24 @@ export const appRouter = router({
       return await db.getAllPromotionCodes();
     }),
 
-    stats: publicProcedure.query(async () => {
-      return await db.getPromotionCodeStats();
-    }),
-
-    available: publicProcedure.query(async () => {
-      return await db.getAvailablePromotionCodes();
-    }),
-
     import: publicProcedure
       .input(z.object({ data: z.string() }))
       .mutation(async ({ input }) => {
         const lines = input.data.trim().split('\n').filter(line => line.trim());
-        const results = { success: 0, failed: 0, duplicate: 0, errors: [] as string[] };
+        const results = { success: 0, duplicates: 0 };
 
         for (const line of lines) {
           const code = line.trim();
           if (!code) continue;
 
-          // 检查是否已存在（去重）
           const existing = await db.getPromotionCodeByCode(code);
           if (existing) {
-            results.duplicate++;
+            results.duplicates++;
             continue;
           }
 
-          try {
-            await db.createPromotionCode({ code });
-            results.success++;
-          } catch (error: any) {
-            results.failed++;
-            results.errors.push(`${code}: ${error.message}`);
-          }
+          await db.createPromotionCode({ code });
+          results.success++;
         }
 
         return results;
@@ -1329,182 +1348,15 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    batchDelete: publicProcedure
-      .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        const count = await db.deletePromotionCodesByIds(input.ids);
-        return { success: true, count };
-      }),
-
-    // 获取一个可用的兑换码（随机）
-    getRandomAvailable: publicProcedure.query(async () => {
-      return await db.getRandomAvailablePromotionCode();
+    getRandom: publicProcedure.query(async () => {
+      return await db.getRandomPromotionCode();
     }),
 
-    // 执行兑换码
-    redeem: publicProcedure
-      .input(z.object({
-        accountInfo: z.string(),
-        promotionCodeId: z.number().optional(),
-      }))
+    markUsed: publicProcedure
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        // 解析账号信息: 邮箱----密码----token
-        const parts = input.accountInfo.trim().split('----');
-        if (parts.length !== 3) {
-          throw new Error('格式错误，请使用: 邮箱----密码----token');
-        }
-
-        const [email, password, token] = parts.map(p => p.trim());
-        const clientId = manusApi.generateClientId();
-
-        // 获取兑换码（指定ID或随机）
-        let promotionCode;
-        if (input.promotionCodeId) {
-          promotionCode = await db.getPromotionCodeById(input.promotionCodeId);
-        } else {
-          promotionCode = await db.getRandomAvailablePromotionCode();
-        }
-
-        if (!promotionCode) {
-          throw new Error('没有可用的兑换码');
-        }
-
-        if (promotionCode.status !== 'available') {
-          throw new Error('该兑换码已被使用或无效');
-        }
-
-        // 获取兑换前的积分
-        const creditsBefore = await manusApi.getCredits(token, clientId);
-        if (manusApi.isBlocked(creditsBefore)) {
-          throw new Error('账号已被封禁');
-        }
-
-        // 执行兑换码
-        const result = await manusApi.redeemPromotionCode(token, clientId, promotionCode.code);
-        
-        if (!result.success) {
-          // 兑换失败，标记为无效
-          await db.updatePromotionCode(promotionCode.id, {
-            status: 'invalid',
-            usedByEmail: email,
-            usedAt: new Date(),
-          });
-          throw new Error(result.error || '兑换失败');
-        }
-
-        // 等待一下获取新积分
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const creditsAfter = await manusApi.getCredits(token, clientId);
-
-        // 更新兑换码状态
-        await db.updatePromotionCode(promotionCode.id, {
-          status: 'used',
-          usedByEmail: email,
-          usedAt: new Date(),
-          creditsBefore: creditsBefore.freeCredits || 0,
-          creditsAfter: creditsAfter.freeCredits || 0,
-        });
-
-        return {
-          success: true,
-          email,
-          promotionCode: promotionCode.code,
-          creditsBefore: creditsBefore.freeCredits || 0,
-          creditsAfter: creditsAfter.freeCredits || 0,
-        };
-      }),
-  }),
-
-  // ============ 批量删除 ============
-  batchDelete: router({
-    accounts: publicProcedure
-      .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        // 先记录到删除表
-        for (const id of input.ids) {
-          const account = await db.getAccountById(id);
-          if (account) {
-            await db.createDeletedNormalAccount({
-              email: account.email,
-              password: account.password,
-              credits: account.totalCredits || 0,
-              sourceTable: 'accounts',
-              deleteReason: 'manual',
-              deleteReasonDetail: '批量删除',
-            });
-          }
-        }
-        const count = await db.deleteAccountsByIds(input.ids);
-        return { success: true, count };
-      }),
-
-    vipAccounts: publicProcedure
-      .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        for (const id of input.ids) {
-          const account = await db.getVipAccountById(id);
-          if (account) {
-            await db.createDeletedVipAccount({
-              email: account.email,
-              password: account.password,
-              credits: account.totalCredits || 0,
-              sourceTable: 'vip_accounts',
-              deleteReason: 'manual',
-              deleteReasonDetail: '批量删除',
-            });
-          }
-        }
-        const count = await db.deleteVipAccountsByIds(input.ids);
-        return { success: true, count };
-      }),
-
-    invitees: publicProcedure
-      .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        const count = await db.deleteInviteesByIds(input.ids);
-        return { success: true, count };
-      }),
-
-    normalStock: publicProcedure
-      .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        for (const id of input.ids) {
-          const account = await db.getNormalAccountStockById(id);
-          if (account) {
-            await db.createDeletedNormalAccount({
-              email: account.email,
-              password: account.password,
-              credits: account.credits,
-              creditCategory: account.creditCategory,
-              sourceTable: 'normal_account_stock',
-              deleteReason: 'manual',
-              deleteReasonDetail: '批量删除',
-            });
-          }
-        }
-        const count = await db.deleteNormalAccountStockByIds(input.ids);
-        return { success: true, count };
-      }),
-
-    vipStock: publicProcedure
-      .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        for (const id of input.ids) {
-          const account = await db.getVipAccountStockById(id);
-          if (account) {
-            await db.createDeletedVipAccount({
-              email: account.email,
-              password: account.password,
-              credits: account.credits,
-              creditCategory: account.creditCategory,
-              sourceTable: 'vip_account_stock',
-              deleteReason: 'manual',
-              deleteReasonDetail: '批量删除',
-            });
-          }
-        }
-        const count = await db.deleteVipAccountStockByIds(input.ids);
-        return { success: true, count };
+        await db.markPromotionCodeUsed(input.id);
+        return { success: true };
       }),
   }),
 });

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Send, Link, Hash, Play, Search, Key, Loader2, Gift } from "lucide-react";
+import { Send, Link, Hash, Play, Search, Key, Loader2 } from "lucide-react";
 
 export default function Invitation() {
   const [inviteCode, setInviteCode] = useState("");
@@ -52,8 +52,6 @@ export default function Invitation() {
     },
   });
 
-  const [redeemCode, setRedeemCode] = useState("");
-
   // 获取邀请码的mutation
   const getInviteCodeMutation = trpc.utils.getInviteCode.useMutation({
     onSuccess: (result) => {
@@ -66,34 +64,6 @@ export default function Invitation() {
       toast.error(`获取邀请码失败: ${error.message}`);
     },
   });
-
-  // 兑换码统计
-  const { data: promotionCodeStats } = trpc.promotionCodes.stats.useQuery();
-
-  // 执行兑换码的mutation
-  const redeemMutation = trpc.promotionCodes.redeem.useMutation({
-    onSuccess: (result) => {
-      toast.success(`兑换成功: ${result.email} 积分 ${result.creditsBefore} → ${result.creditsAfter} (+${result.creditsAfter - result.creditsBefore})`);
-      utils.promotionCodes.stats.invalidate();
-      utils.promotionCodes.list.invalidate();
-    },
-    onError: (error) => {
-      toast.error(`兑换失败: ${error.message}`);
-    },
-  });
-
-  // 执行兑换码
-  const handleRedeemCode = () => {
-    if (!accountInfo.trim()) {
-      toast.error("请先输入账号信息");
-      return;
-    }
-
-    // 如果没有输入兑换码，将自动从库中选择
-    redeemMutation.mutate({
-      accountInfo: accountInfo.trim(),
-    });
-  };
 
   // 筛选符合条件的账号
   const filteredInvitees = useMemo(() => {
@@ -256,7 +226,7 @@ export default function Invitation() {
           <CardDescription>设置邀请码和邀请者账号</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 账号信息输入框 - 自动获取邀请码 + 兑换码操作 */}
+          {/* 账号信息输入框 - 自动获取邀请码 */}
           <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
             <div className="flex items-center gap-2 mb-3">
               <Key className="w-5 h-5 text-purple-600" />
@@ -276,39 +246,6 @@ export default function Invitation() {
               />
               <p className="text-xs text-purple-600">
                 输入完整的账号信息后，系统将自动获取邀请码并填写到下方
-              </p>
-            </div>
-            
-            {/* 兑换码操作 */}
-            <div className="mt-4 pt-4 border-t border-purple-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Gift className="w-5 h-5 text-purple-600" />
-                <h4 className="font-medium text-purple-900">兑换码操作</h4>
-                <Badge variant="secondary" className="ml-2">
-                  可用: {promotionCodeStats?.available || 0}
-                </Badge>
-              </div>
-              <div className="flex items-end gap-4">
-                <div className="flex-1 space-y-2">
-                  <Label className="text-purple-800">兑换码（可手动输入或留空自动选择）</Label>
-                  <Input
-                    placeholder="留空将自动从库中随机选择一个兑换码"
-                    value={redeemCode}
-                    onChange={(e) => setRedeemCode(e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-                <Button
-                  onClick={handleRedeemCode}
-                  disabled={redeemMutation.isPending || !accountInfo.trim()}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  <Gift className="w-4 h-4 mr-2" />
-                  {redeemMutation.isPending ? "兑换中..." : "执行兑换"}
-                </Button>
-              </div>
-              <p className="text-xs text-purple-600 mt-2">
-                使用上方输入的账号信息执行兑换码操作，兑换成功后将自动更新账号积分
               </p>
             </div>
           </div>
