@@ -72,7 +72,7 @@ export default function Invitation() {
     executeMutation.mutate({
       inviteeIds: selectedInviteeIds,
       inviteCode: code,
-      inviterAccountId: inviterAccountId ? parseInt(inviterAccountId) : undefined,
+      inviterAccountId: inviterAccountId && inviterAccountId !== "manual" ? parseInt(inviterAccountId) : undefined,
     });
   };
 
@@ -98,7 +98,7 @@ export default function Invitation() {
                   <SelectValue placeholder="选择账号或手动输入邀请码" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">手动输入邀请码</SelectItem>
+                  <SelectItem value="manual">手动输入邀请码</SelectItem>
                   {accounts?.map((account) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
                       {account.email} ({account.inviteCode || "无邀请码"})
