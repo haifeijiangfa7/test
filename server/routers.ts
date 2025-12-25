@@ -940,12 +940,36 @@ export const appRouter = router({
           completedAt: finalStatus === 'completed' ? new Date() : undefined,
         });
 
-        // 任务完成后，将目标账号更新到库存中
+        // 任务完成后，从 API 获取目标账号的真实积分并更新到库存和 accounts 表
         if (finalStatus === 'completed' && task.targetAccountId) {
-          const finalCredits = task.initialCredits + (completed * 500);
+          // 获取目标账号信息
+          let targetAccount = null;
+          if (task.mode === 'normal_account') {
+            targetAccount = await db.getAccountById(task.targetAccountId);
+          } else if (task.mode === 'vip_account') {
+            targetAccount = await db.getVipAccountById(task.targetAccountId);
+          }
+          
+          // 从 API 获取真实积分
+          let finalCredits = task.initialCredits + (completed * 500); // 默认计算值
+          if (targetAccount) {
+            try {
+              const realCredits = await manusApi.getCredits(targetAccount.token, targetAccount.clientId);
+              finalCredits = realCredits.freeCredits || finalCredits;
+            } catch (e) {
+              // 获取失败时使用计算值
+            }
+          }
           const creditCategory = manusApi.getCreditCategory(finalCredits);
           
           if (task.mode === 'normal_account') {
+            // 更新 accounts 表中的积分信息
+            await db.updateAccount(task.targetAccountId, {
+              totalCredits: finalCredits,
+              freeCredits: finalCredits,
+              lastCheckedAt: new Date(),
+            });
+            
             // 检查目标账号是否已在库存中
             const existingStock = await db.getNormalAccountStockByEmail(task.targetEmail || '');
             if (existingStock) {
@@ -978,6 +1002,13 @@ export const appRouter = router({
               taskId: task.id,
             });
           } else if (task.mode === 'vip_account') {
+            // 更新 vipAccounts 表中的积分信息
+            await db.updateVipAccount(task.targetAccountId, {
+              totalCredits: finalCredits,
+              freeCredits: finalCredits,
+              lastCheckedAt: new Date(),
+            });
+            
             // 检查目标账号是否已在库存中
             const existingStock = await db.getVipAccountStockByEmail(task.targetEmail || '');
             if (existingStock) {

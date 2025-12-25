@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -107,6 +107,24 @@ export default function AccountStock() {
   const { data: extractedVip } = trpc.stock.extracted.vip.useQuery();
   const { data: deletedNormal } = trpc.stock.deleted.normal.useQuery();
   const { data: deletedVip } = trpc.stock.deleted.vip.useQuery();
+
+  // 页面加载时自动刷新所有账号数据
+  const hasAutoRefreshed = useRef(false);
+  useEffect(() => {
+    if (!hasAutoRefreshed.current && accounts && accounts.length > 0) {
+      hasAutoRefreshed.current = true;
+      // 静默刷新所有账号，不显示toast
+      refreshAllAccountsMutation.mutate(undefined, {
+        onSuccess: () => {
+          utils.accounts.list.invalidate();
+          utils.stats.get.invalidate();
+        },
+        onError: () => {
+          // 静默失败
+        },
+      });
+    }
+  }, [accounts]);
 
   const handleImport = () => {
     if (importType === "normal") {
