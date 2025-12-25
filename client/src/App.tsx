@@ -5,34 +5,39 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Invitees from "./pages/Invitees";
+import Invitation from "./pages/Invitation";
+import CreditTasks from "./pages/CreditTasks";
+import InvitationLogs from "./pages/InvitationLogs";
+import AccountLogs from "./pages/AccountLogs";
+import AccountStock from "./pages/AccountStock";
+import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+      <Route path="/invitees" component={Invitees} />
+      <Route path="/invitation" component={Invitation} />
+      <Route path="/credit-tasks" component={CreditTasks} />
+      <Route path="/logs" component={InvitationLogs} />
+      <Route path="/account-logs" component={AccountLogs} />
+      <Route path="/account-stock" component={AccountStock} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <DashboardLayout>
+            <Router />
+          </DashboardLayout>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
